@@ -1,0 +1,11 @@
+# Ignore all user-specific Xcode state
+**/xcuserdata/
+**/*.xcuserstate
+**/*.xcbkptlist
+
+# Ignore build artifacts and derived data
+DerivedData/
+build/
+
+# macOS system noise
+.DS_Store

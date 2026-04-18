@@ -152,9 +152,7 @@ struct Outliner: NSViewRepresentable {
 				}
 				
 				// Create the new node.
-				let newNodeLocation = parent.document.splitNode(after: node, in: textView)
-				let parent = newNodeLocation.0
-				let index = newNodeLocation.1
+				let (parent, index) = parent.document.splitNode(after: node, in: textView)
 				
 				outlineView.insertItems(
 					at: IndexSet(integer: index),

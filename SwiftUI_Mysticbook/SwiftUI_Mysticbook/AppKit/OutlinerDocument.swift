@@ -18,7 +18,7 @@ class OutlinerDocument {
 	
 	@discardableResult
 	func splitNode(after node: OutlinerNode, in textView: NSTextView)
-	-> (OutlinerNode, Int) {
+	-> (parent: OutlinerNode, index: Int) {
 		
 		let isRoot = node.isRoot()
 		let selectedRange = textView.selectedRange()

@@ -120,6 +120,7 @@ struct Outliner: NSViewRepresentable {
 				doCommandBy commandSelector: Selector
 			) -> Bool {
 				
+				// If insert new line command is requested, the delegate handles it.
 				if commandSelector == #selector(NSResponder.insertNewline(_:)) {
 					handleReturnKey(in: textView)
 					return true
@@ -128,42 +129,41 @@ struct Outliner: NSViewRepresentable {
 				return false
 			}
 			
+			// When the return key is pressed in a text view, we will split the
+			// text view's node.
 			private func handleReturnKey(in textView: NSTextView) {
 				
 				// Find the outline view and the current node.
+				// sequence(first:next) recursively generates the next value using the
+				// first value. It generates a lazy sequence, meaning the actual values
+				// aren't generated until they are used.
 				guard let outlineView = sequence(
 					first: textView as NSTextView?,
 					next: { $0?.superview
-					}).compactMap({ $0 as? NSOutlineView }).first,
+					})
+					// Removes the nils and transforms each optional NSOutlineViews into
+					// non-optional ones.
+					.compactMap({ $0 as? NSOutlineView }).first,
 							let node = outlineView.item(
 								atRow: outlineView.row(for: textView)) as? OutlinerNode else {
+					// Perform the default behavior.
 					textView.insertNewlineIgnoringFieldEditor(nil)
 					return
 				}
 				
-				let selectedRange = textView.selectedRange()
+				// Create the new node.
+				parent.document.splitNode(after: node, in: textView)
 				
-				if selectedRange.length > 0 {
-					textView.insertNewlineIgnoringFieldEditor(nil)
-					return
-				}
-				
-				let utf16Offset = selectedRange.location
-				let text = node.text
-				let splitIndex = String.Index(utf16Offset: utf16Offset, in: text)
-				
-				parent.document.splitNode(after: node, at: splitIndex)
-				
+				// Marks the outline view as needing redisplay so it will reload the
+				// data for visible cells and draw the new values.
 				outlineView.reloadData()
 				
 				NSAnimationContext.beginGrouping()
 				NSAnimationContext.current.duration = 0
+				// Update the row's height.
 				outlineView.noteHeightOfRows(
 					withIndexesChanged: IndexSet(integer: outlineView.row(for: textView)))
 				NSAnimationContext.endGrouping()
-				
-				
-				
 			}
 
 			/// NSOutlineViewDelegate

@@ -5,6 +5,7 @@
 //  Created by Andrew Shinjo on 4/17/26.
 //
 
+import AppKit
 import Foundation
 class OutlinerDocument {
 	
@@ -14,9 +15,13 @@ class OutlinerDocument {
 		self.rootNode = rootNode
 	}
 	
-	func splitNode(after node: OutlinerNode, at splitIndex: String.Index) {
+	func splitNode(after node: OutlinerNode, in textView: NSTextView) {
 		
 		let isRoot = node.isRoot()
+		let selectedRange = textView.selectedRange()
+		let utf16Offset = selectedRange.location
+		let text = node.text
+		let splitIndex = String.Index(utf16Offset: utf16Offset, in: text)
 		
 		// Get the left and right side of node's string
 		let leftSubstring = node.text.prefix(upTo: splitIndex)

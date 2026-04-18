@@ -167,6 +167,11 @@ struct Outliner: NSViewRepresentable {
 					withIndexesChanged: IndexSet(integer: outlineView.row(for: textView)))
 				NSAnimationContext.endGrouping()
 				
+				// Expand the parent if collapsed so that the new child is visible.
+				if !outlineView.isItemExpanded(parent) {
+					outlineView.expandItem(parent)
+				}
+				
 				// Set focus.
 				
 				let newNode = parent.children[index]

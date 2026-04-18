@@ -33,7 +33,6 @@ class OutlinerDocument {
 		node.text = String(leftSubstring)
 		let newNode = OutlinerNode(text: String(rightSubstring))
 		
-		
 		if isRoot {
 			node.children.insert(newNode, at: 0)
 			newNode.parent = node
@@ -50,6 +49,5 @@ class OutlinerDocument {
 			newNode.parent = parent
 			return (parent: parent, index: insertIndex)
 		}
-			
 	}
 }

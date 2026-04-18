@@ -81,28 +81,31 @@ struct Outliner: NSViewRepresentable {
 			// formatting attributes.
 			func textDidChange(_ notification: Notification) {
 				
-				// Extract the text view object from the notification.
-				guard let textView = notification.object as? NSTextView,
-							let outlineView = textView.superview?.superview as? NSOutlineView
-				else {
+				// Extract the text view out of the notification.
+				guard let textView = notification.object as? NSTextView else { return }
+				
+				// Walk up the view hierarchy to find the outline view
+				guard let outlineView = sequence(
+					first: textView as NSView?,
+					next: { $0?.superview }
+				)
+					.compactMap({ $0 as? NSOutlineView })
+					.first else {
 					return
 				}
 				
-				// Returns the row for the text view in the outline view.
 				let rowIndex = outlineView.row(for: textView)
-				
-				// If the row isn't found, then exit.
 				if rowIndex == -1 {
 					return
 				}
 				
-				// Synchronize the text view and data model.
 				if let node = outlineView.item(atRow: rowIndex) as? OutlinerNode,
 					 node.text != textView.string {
 					node.text = textView.string
-					
-					// Tell the outline view to update the height.
+					NSAnimationContext.beginGrouping()
+					NSAnimationContext.current.duration = 0
 					outlineView.noteHeightOfRows(withIndexesChanged: IndexSet(integer: rowIndex))
+					NSAnimationContext.endGrouping()
 				}
 			}
 
@@ -284,32 +287,53 @@ struct Outliner: NSViewRepresentable {
 				viewFor tableColumn: NSTableColumn?,
 				item: Any
 			) -> NSView? {
+					
+				let cellIdentifier = parent.identifier
+				var cell = outlineView.makeView(withIdentifier: cellIdentifier, owner: self) as? NSTableCellView
 				
-				// Returns a new or existing view with the specified identifier.
-				var view = outlineView.makeView(
-					withIdentifier: parent.identifier, owner: self) as? NSTextView
-								
-				// If the view doesn't exist, then create a new one.
-				if view == nil {
-					view = NSTextView()
-					view?.delegate = self
-					view?.identifier = parent.identifier
+				if cell == nil {
+					cell = NSTableCellView()
+					cell?.identifier = cellIdentifier
+					
+					let textView = NSTextView()
+					textView.delegate = self
+					
+					// Inset is padding around the text view.
+					textView.textContainerInset = .zero
+					textView.textContainer?.lineFragmentPadding = 0
+					textView.isVerticallyResizable = true
+					textView.isHorizontallyResizable = false
+					textView.textContainer?.heightTracksTextView = true
+					textView.textContainer?.widthTracksTextView = true
+					
+					textView.translatesAutoresizingMaskIntoConstraints = false
+					cell?.addSubview(textView)
+					
+					NSLayoutConstraint.activate([
+						textView.leadingAnchor.constraint(equalTo: cell!.leadingAnchor),
+						textView.trailingAnchor.constraint(equalTo: cell!.trailingAnchor),
+						textView.topAnchor.constraint(equalTo: cell!.topAnchor),
+						textView.bottomAnchor.constraint(equalTo: cell!.bottomAnchor)
+					])
+					
+					textView.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+					
+					// Optional debug border
+					textView.wantsLayer = true
+					textView.layer?.borderWidth = 1
+					textView.layer?.borderColor = NSColor.red.cgColor
 				}
 				
-				// Set the textview's string to the node's text.
+				// Find the text view inside the cell
+				guard let textView = cell?.subviews.first(where: { $0 is NSTextView }) as? NSTextView else {
+					return cell
+				}
+				
 				if let node = item as? OutlinerNode {
-					view?.string = node.text
+					textView.string = node.text
 				}
 				
-				view?.textContainer?.heightTracksTextView = true
-				view?.textContainer?.widthTracksTextView = true
-				
-				// Need to set wantsLayer to show a border.
-				view?.wantsLayer = true
-				view?.layer?.borderWidth = 1
-				view?.layer?.borderColor = NSColor.red.cgColor
-				
-				return view
+				return cell
 			}
 			
 			/// NSOutlineViewDataSource

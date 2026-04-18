@@ -7,6 +7,7 @@
 
 import AppKit
 import Foundation
+
 class OutlinerDocument {
 	
 	let rootNode: OutlinerNode

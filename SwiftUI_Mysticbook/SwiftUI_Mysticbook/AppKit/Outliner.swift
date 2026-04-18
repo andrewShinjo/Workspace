@@ -9,7 +9,8 @@ import SwiftUI
 
 struct Outliner: NSViewRepresentable {
 	
-	let rootNodes: [OutlinerNode]?
+	let document: OutlinerDocument
+	//let rootNodes: [OutlinerNode]?
 	let identifier = NSUserInterfaceItemIdentifier("MainColumn")
 	
 	func makeNSView(context: Context) -> some NSView {
@@ -107,6 +108,62 @@ struct Outliner: NSViewRepresentable {
 					outlineView.noteHeightOfRows(withIndexesChanged: IndexSet(integer: rowIndex))
 					NSAnimationContext.endGrouping()
 				}
+			}
+			
+			// Sent to allow the delegate to perform the command for the text view.
+			// textView = the text view sending the message
+			// commandSelector = the selector
+			// Return true to tell the text view the delegate will handle the command.
+			// Return false to tell the text view to handle the command.
+			func textView(
+				_ textView: NSTextView,
+				doCommandBy commandSelector: Selector
+			) -> Bool {
+				
+				if commandSelector == #selector(NSResponder.insertNewline(_:)) {
+					handleReturnKey(in: textView)
+					return true
+				}
+				
+				return false
+			}
+			
+			private func handleReturnKey(in textView: NSTextView) {
+				
+				// Find the outline view and the current node.
+				guard let outlineView = sequence(
+					first: textView as NSTextView?,
+					next: { $0?.superview
+					}).compactMap({ $0 as? NSOutlineView }).first,
+							let node = outlineView.item(
+								atRow: outlineView.row(for: textView)) as? OutlinerNode else {
+					textView.insertNewlineIgnoringFieldEditor(nil)
+					return
+				}
+				
+				let selectedRange = textView.selectedRange()
+				
+				if selectedRange.length > 0 {
+					textView.insertNewlineIgnoringFieldEditor(nil)
+					return
+				}
+				
+				let utf16Offset = selectedRange.location
+				let text = node.text
+				let splitIndex = String.Index(utf16Offset: utf16Offset, in: text)
+				
+				parent.document.splitNode(after: node, at: splitIndex)
+				
+				outlineView.reloadData()
+				
+				NSAnimationContext.beginGrouping()
+				NSAnimationContext.current.duration = 0
+				outlineView.noteHeightOfRows(
+					withIndexesChanged: IndexSet(integer: outlineView.row(for: textView)))
+				NSAnimationContext.endGrouping()
+				
+				
+				
 			}
 
 			/// NSOutlineViewDelegate
@@ -344,7 +401,7 @@ struct Outliner: NSViewRepresentable {
 				ofItem item: Any?
 			) -> Any {
 				guard let node = item as? OutlinerNode else {
-					return parent.rootNodes![index]
+					return parent.document.rootNode
 				}
 				
 				return node.children[index]
@@ -365,7 +422,7 @@ struct Outliner: NSViewRepresentable {
 				numberOfChildrenOfItem item: Any?
 			) -> Int {
 				guard let node = item as? OutlinerNode else {
-					return parent.rootNodes?.count ?? 0
+					return 1
 				}
 				return node.children.count
 			}

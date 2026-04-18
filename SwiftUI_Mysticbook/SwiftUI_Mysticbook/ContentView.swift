@@ -10,14 +10,15 @@ import SwiftUI
 struct ContentView: View {
 	
 	@State private var focused = Set<UUID>()
+	
+	let rootNode = OutlinerNode(
+	 text: "Root node",
+	 children: [OutlinerNode(text: "Child")]
+ )
+	 
 		
 	var body: some View {
-		Outliner(rootNodes: [
-			OutlinerNode(
-				text: "Root node",
-				children: [OutlinerNode(text: "Child")]
-			)
-		])
+		Outliner(document: OutlinerDocument(rootNode: rootNode))
 	}
 }
 

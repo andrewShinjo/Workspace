@@ -152,14 +152,12 @@ struct Outliner: NSViewRepresentable {
 				}
 				
 				// Create the new node.
-				let newNode = parent.document.splitNode(after: node, in: textView)
-				let parent = newNode.parent
-				let index = parent!.children.firstIndex(where: {
-					$0.id == newNode.id
-				})
+				let newNodeLocation = parent.document.splitNode(after: node, in: textView)
+				let parent = newNodeLocation.0
+				let index = newNodeLocation.1
 				
 				outlineView.insertItems(
-					at: IndexSet(integer: index!),
+					at: IndexSet(integer: index),
 					inParent: parent,
 					withAnimation: .slideDown
 				)
@@ -172,6 +170,8 @@ struct Outliner: NSViewRepresentable {
 				NSAnimationContext.endGrouping()
 				
 				// Set focus.
+				
+				let newNode = parent.children[index]
 				let row = outlineView.row(forItem: newNode)
 				guard row != -1,
 							let cellView = outlineView.view(atColumn: 0, row: row, makeIfNecessary: false) as? NSTableCellView,

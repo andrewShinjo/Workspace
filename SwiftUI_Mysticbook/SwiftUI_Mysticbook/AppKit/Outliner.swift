@@ -152,11 +152,17 @@ struct Outliner: NSViewRepresentable {
 				}
 				
 				// Create the new node.
-				parent.document.splitNode(after: node, in: textView)
+				let newNode = parent.document.splitNode(after: node, in: textView)
+				let parent = newNode.parent
+				let index = parent!.children.firstIndex(where: {
+					$0.id == newNode.id
+				})
 				
-				// Marks the outline view as needing redisplay so it will reload the
-				// data for visible cells and draw the new values.
-				outlineView.reloadData()
+				outlineView.insertItems(
+					at: IndexSet(integer: index!),
+					inParent: parent,
+					withAnimation: .slideDown
+				)
 				
 				NSAnimationContext.beginGrouping()
 				NSAnimationContext.current.duration = 0
@@ -164,6 +170,17 @@ struct Outliner: NSViewRepresentable {
 				outlineView.noteHeightOfRows(
 					withIndexesChanged: IndexSet(integer: outlineView.row(for: textView)))
 				NSAnimationContext.endGrouping()
+				
+				// Set focus.
+				let row = outlineView.row(forItem: newNode)
+				guard row != -1,
+							let cellView = outlineView.view(atColumn: 0, row: row, makeIfNecessary: false) as? NSTableCellView,
+							let textView = cellView.subviews.first(where: { $0 is NSTextView }) as? NSTextView else {
+						return
+				}
+
+				outlineView.window?.makeFirstResponder(textView)
+				textView.setSelectedRange(NSRange(location: 0, length: 0))
 			}
 
 			/// NSOutlineViewDelegate

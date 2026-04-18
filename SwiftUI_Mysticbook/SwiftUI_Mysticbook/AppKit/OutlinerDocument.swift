@@ -15,7 +15,8 @@ class OutlinerDocument {
 		self.rootNode = rootNode
 	}
 	
-	func splitNode(after node: OutlinerNode, in textView: NSTextView) {
+	@discardableResult
+	func splitNode(after node: OutlinerNode, in textView: NSTextView) -> OutlinerNode {
 		
 		let isRoot = node.isRoot()
 		let selectedRange = textView.selectedRange()
@@ -41,5 +42,7 @@ class OutlinerDocument {
 				newNode.parent = parent
 			}
 		}
+			
+		return newNode
 	}
 }

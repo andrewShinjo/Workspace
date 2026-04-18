@@ -7,6 +7,7 @@
 
 import AppKit
 import Foundation
+
 class OutlinerDocument {
 	
 	let rootNode: OutlinerNode
@@ -15,7 +16,9 @@ class OutlinerDocument {
 		self.rootNode = rootNode
 	}
 	
-	func splitNode(after node: OutlinerNode, in textView: NSTextView) {
+	@discardableResult
+	func splitNode(after node: OutlinerNode, in textView: NSTextView)
+	-> (parent: OutlinerNode, index: Int) {
 		
 		let isRoot = node.isRoot()
 		let selectedRange = textView.selectedRange()
@@ -33,13 +36,18 @@ class OutlinerDocument {
 		if isRoot {
 			node.children.insert(newNode, at: 0)
 			newNode.parent = node
+			return (node, 0)
 		}
 		else {
-			if let parent = node.parent,
-				 let index = parent.children.firstIndex(where: { $0.id == node.id }) {
-				parent.children.insert(newNode, at: index + 1)
-				newNode.parent = parent
+			guard let parent = node.parent,
+						let index = parent.children.firstIndex(where: { $0.id == node.id }) else {
+				fatalError("Node has no parent or not found in parent's children")
 			}
+			
+			let insertIndex = index + 1
+			parent.children.insert(newNode, at: insertIndex)
+			newNode.parent = parent
+			return (parent: parent, index: insertIndex)
 		}
 	}
 }

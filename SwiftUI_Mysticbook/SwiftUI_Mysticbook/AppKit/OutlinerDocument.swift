@@ -16,6 +16,31 @@ class OutlinerDocument {
 		self.rootNode = rootNode
 	}
 	
+	func indentNode(_ node: OutlinerNode) {
+		
+		// If the node is root, can't indent.
+		guard let parent = node.parent else {
+			return
+		}
+		
+		guard let index = parent.children.firstIndex(where: {
+			$0.id == node.id
+		})
+		else {
+			return
+		}
+		
+		if index == 0 {
+			return
+		}
+		
+		parent.children.remove(at: index)
+		
+		let newParent = parent.children[index - 1]
+		newParent.children.append(node)
+		node.parent = newParent
+	}
+	
 	func mergeNode(_ node: OutlinerNode) {
 		
 		guard let parent = node.parent else {

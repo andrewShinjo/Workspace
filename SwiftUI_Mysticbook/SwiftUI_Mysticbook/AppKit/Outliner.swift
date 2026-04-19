@@ -154,7 +154,27 @@ struct Outliner: NSViewRepresentable {
 				
 				parent.document.indentNode(node)
 				outlineView.reloadData()
+				
+				// TODO Focus after indent
+				
+				DispatchQueue.main.async {
+					self.focusNode(in: outlineView, node: node, cursorAtEnd: false)
+				}
+
 			}
+			
+			private func focusNode(in outlineView: NSOutlineView, node: OutlinerNode, cursorAtEnd: Bool) {
+				let row = outlineView.row(forItem: node)
+				guard row != -1,
+							let cellView = outlineView.view(atColumn: 0, row: row, makeIfNecessary: false) as? NSTableCellView,
+							let textView = cellView.subviews.first(where: { $0 is NSTextView }) as? NSTextView else {
+						return
+				}
+				outlineView.window?.makeFirstResponder(textView)
+				let position = cursorAtEnd ? textView.string.count : 0
+				textView.setSelectedRange(NSRange(location: position, length: 0))
+			}
+
 			
 			private func handleDeleteKey(in textView: NSTextView) {
 				

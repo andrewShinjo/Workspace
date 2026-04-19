@@ -120,6 +120,11 @@ struct Outliner: NSViewRepresentable {
 				doCommandBy commandSelector: Selector
 			) -> Bool {
 				
+				// If delete backward command is requested, the delegate handles it.
+				if commandSelector == #selector(NSResponder.deleteBackward(_:)) {
+					handleDeleteKey(in: textView)
+					return true
+				}
 				// If insert new line command is requested, the delegate handles it.
 				if commandSelector == #selector(NSResponder.insertNewline(_:)) {
 					handleReturnKey(in: textView)
@@ -127,6 +132,63 @@ struct Outliner: NSViewRepresentable {
 				}
 				
 				return false
+			}
+			
+			private func handleDeleteKey(in textView: NSTextView) {
+				
+				guard let outlineView = sequence(
+					first: textView as NSTextView?,
+					next: { $0?.superview }
+				)
+					.compactMap({ $0 as? NSOutlineView }).first,
+							let node = outlineView.item(
+								atRow: outlineView.row(for: textView)
+							) as? OutlinerNode else {
+					return
+				}
+				
+				let row = outlineView.row(for: textView)
+				
+				guard row != -1
+				else {
+					return
+				}
+				
+				guard let childIndex = node.parent!.children.firstIndex(where: { $0.id == node.id })
+				else {
+					return
+				}
+					
+				parent.document.mergeNode(node)
+				
+				outlineView.removeItems(
+					at: IndexSet(integer: childIndex),
+					inParent: node.parent,
+					withAnimation: .effectFade
+				)
+				
+				// Set the focus.
+				// Two cases:
+				// (1) Set focus on parent
+				// (2) Set focus on previous sibling
+				
+				let focusRow = (childIndex == 0) ?
+				outlineView.row(forItem: node.parent!) :
+				outlineView.row(forItem: node.parent!.children[childIndex - 1])
+				
+				let cellView = outlineView.view(
+					atColumn: 0,
+					row: focusRow,
+					makeIfNecessary: false
+				)
+				as? NSTableCellView
+				let textView = cellView?.subviews.first(where: {
+					$0 is NSTextView
+				})
+				as? NSTextView
+				
+				outlineView.window?.makeFirstResponder(textView)
+				
 			}
 			
 			// When the return key is pressed in a text view, we will split the
@@ -139,8 +201,8 @@ struct Outliner: NSViewRepresentable {
 				// aren't generated until they are used.
 				guard let outlineView = sequence(
 					first: textView as NSTextView?,
-					next: { $0?.superview
-					})
+					next: { $0?.superview }
+				)
 					// Removes the nils and transforms each optional NSOutlineViews into
 					// non-optional ones.
 					.compactMap({ $0 as? NSOutlineView }).first,

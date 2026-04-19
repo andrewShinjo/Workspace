@@ -227,6 +227,8 @@ struct Outliner: NSViewRepresentable {
 				// Create the new node.
 				let (parent, index) = parent.document.splitNode(after: node, in: textView)
 				
+				print("parent.text: \(parent.text)")
+				
 				outlineView.insertItems(
 					at: IndexSet(integer: index),
 					inParent: parent,
@@ -243,6 +245,27 @@ struct Outliner: NSViewRepresentable {
 				// Expand the parent if collapsed so that the new child is visible.
 				if !outlineView.isItemExpanded(parent) {
 					outlineView.expandItem(parent)
+				}
+				
+				// Update view of node that was split.
+				
+				if index == 0 {
+					// update parent
+					outlineView.reloadData(
+						forRowIndexes: IndexSet(
+							integer: outlineView.row(forItem: parent)
+						),
+						columnIndexes: IndexSet(integer: 0)
+					)
+				}
+				else {
+					// update sibling
+					outlineView.reloadData(
+						forRowIndexes: IndexSet(
+							integer: outlineView.row(forItem: parent.children[index - 1])
+						),
+						columnIndexes: IndexSet(integer: 0)
+					)
 				}
 				
 				// Set focus.

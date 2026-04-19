@@ -143,7 +143,6 @@ struct Outliner: NSViewRepresentable {
 					return
 				}
 				
-				
 				guard let outlineView = sequence(
 					first: textView as NSTextView?,
 					next: { $0?.superview }

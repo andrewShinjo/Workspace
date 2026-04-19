@@ -235,15 +235,18 @@ struct Outliner: NSViewRepresentable {
 				// Set focus.
 				
 				let newNode = parent.children[index]
-				let row = outlineView.row(forItem: newNode)
-				guard row != -1,
-							let cellView = outlineView.view(atColumn: 0, row: row, makeIfNecessary: false) as? NSTableCellView,
-							let textView = cellView.subviews.first(where: { $0 is NSTextView }) as? NSTextView else {
-						return
-				}
+				let focusRow = outlineView.row(forItem: newNode)
+				let cellView = outlineView.view(
+					atColumn: 0,
+					row: focusRow,
+					makeIfNecessary: false
+				)
+				as? NSTableCellView
+				let textView = cellView?.subviews.first(where: { $0 is NSTextView })
+				as? NSTextView
 
 				outlineView.window?.makeFirstResponder(textView)
-				textView.setSelectedRange(NSRange(location: 0, length: 0))
+				textView!.setSelectedRange(NSRange(location: 0, length: 0))
 			}
 
 			/// NSOutlineViewDelegate

@@ -245,6 +245,27 @@ struct Outliner: NSViewRepresentable {
 					outlineView.expandItem(parent)
 				}
 				
+				// Update view of node that was split.
+				
+				if index == 0 {
+					// update parent
+					outlineView.reloadData(
+						forRowIndexes: IndexSet(
+							integer: outlineView.row(forItem: parent)
+						),
+						columnIndexes: IndexSet(integer: 0)
+					)
+				}
+				else {
+					// update sibling
+					outlineView.reloadData(
+						forRowIndexes: IndexSet(
+							integer: outlineView.row(forItem: parent.children[index - 1])
+						),
+						columnIndexes: IndexSet(integer: 0)
+					)
+				}
+				
 				// Set focus.
 				
 				let newNode = parent.children[index]

@@ -144,18 +144,19 @@ struct Outliner: NSViewRepresentable {
 							let node = outlineView.item(
 								atRow: outlineView.row(for: textView)
 							) as? OutlinerNode else {
+					textView.deleteBackward(nil)
 					return
 				}
 				
-				let row = outlineView.row(for: textView)
-				
-				guard row != -1
+				guard let nodeParent = node.parent
 				else {
+					textView.deleteBackward(nil)
 					return
 				}
 				
-				guard let childIndex = node.parent!.children.firstIndex(where: { $0.id == node.id })
+				guard let childIndex = nodeParent.children.firstIndex(where: { $0.id == node.id })
 				else {
+					textView.deleteBackward(nil)
 					return
 				}
 					

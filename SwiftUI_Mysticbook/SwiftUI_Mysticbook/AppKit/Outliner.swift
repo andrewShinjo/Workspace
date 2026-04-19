@@ -174,8 +174,8 @@ struct Outliner: NSViewRepresentable {
 				// (2) Set focus on previous sibling
 				
 				let focusRow = (childIndex == 0) ?
-				outlineView.row(forItem: node.parent!) :
-				outlineView.row(forItem: node.parent!.children[childIndex - 1])
+				outlineView.row(forItem: nodeParent) :
+				outlineView.row(forItem: nodeParent.children[childIndex - 1])
 				
 				let cellView = outlineView.view(
 					atColumn: 0,
@@ -183,13 +183,10 @@ struct Outliner: NSViewRepresentable {
 					makeIfNecessary: false
 				)
 				as? NSTableCellView
-				let textView = cellView?.subviews.first(where: {
-					$0 is NSTextView
-				})
+				let textView = cellView?.subviews.first(where: { $0 is NSTextView })
 				as? NSTextView
 				
 				outlineView.window?.makeFirstResponder(textView)
-				
 			}
 			
 			// When the return key is pressed in a text view, we will split the

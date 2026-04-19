@@ -130,8 +130,30 @@ struct Outliner: NSViewRepresentable {
 					handleReturnKey(in: textView)
 					return true
 				}
+				if commandSelector == #selector(NSResponder.insertTab(_:)) {
+					handleIndent(in: textView)
+					return true
+				}
 				
 				return false
+			}
+			
+			private func handleIndent(in textView: NSTextView) {
+				
+				guard let outlineView = sequence(
+					first: textView as NSTextView?,
+					next: { $0?.superview }
+				)
+					.compactMap({ $0 as? NSOutlineView }).first,
+							let node = outlineView.item(
+								atRow: outlineView.row(for: textView)
+							) as? OutlinerNode else {
+					textView.deleteBackward(nil)
+					return
+				}
+				
+				parent.document.indentNode(node)
+				outlineView.reloadData()
 			}
 			
 			private func handleDeleteKey(in textView: NSTextView) {

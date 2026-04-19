@@ -166,6 +166,11 @@ struct Outliner: NSViewRepresentable {
 					textView.deleteBackward(nil)
 					return
 				}
+				
+				// Save the text of the node to be deleted.
+				let nodeToBeDeletedText = node.text
+				
+				print("nodeToBeDeletedText: \(nodeToBeDeletedText)")
 					
 				parent.document.mergeNode(node)
 				
@@ -184,16 +189,22 @@ struct Outliner: NSViewRepresentable {
 				outlineView.row(forItem: nodeParent) :
 				outlineView.row(forItem: nodeParent.children[childIndex - 1])
 				
+				// Reload the data to update the view.
+				outlineView.reloadData(
+					forRowIndexes: IndexSet(integer: focusRow),
+					columnIndexes: IndexSet(integer: 0)
+				)
+				
 				let cellView = outlineView.view(
 					atColumn: 0,
 					row: focusRow,
 					makeIfNecessary: false
 				)
 				as? NSTableCellView
-				let textView = cellView?.subviews.first(where: { $0 is NSTextView })
+				let focusedTextView = cellView?.subviews.first(where: { $0 is NSTextView })
 				as? NSTextView
 				
-				outlineView.window?.makeFirstResponder(textView)
+				outlineView.window?.makeFirstResponder(focusedTextView)
 			}
 			
 			// When the return key is pressed in a text view, we will split the

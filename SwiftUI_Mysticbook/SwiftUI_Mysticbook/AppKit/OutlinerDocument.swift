@@ -16,6 +16,29 @@ class OutlinerDocument {
 		self.rootNode = rootNode
 	}
 	
+	func mergeNode(_ node: OutlinerNode) {
+		
+		guard let parent = node.parent else {
+			return
+		}
+		
+		guard let index = parent.children.firstIndex(where: {
+			$0.id == node.id
+		}) else {
+			return
+		}
+				
+		if index == 0 {
+			parent.text += node.text
+		}
+		else {
+			let previousSibling = parent.children[index - 1]
+			previousSibling.text += node.text
+		}
+		
+		parent.children.remove(at: index)
+	}
+	
 	@discardableResult
 	func splitNode(after node: OutlinerNode, in textView: NSTextView)
 	-> (parent: OutlinerNode, index: Int) {

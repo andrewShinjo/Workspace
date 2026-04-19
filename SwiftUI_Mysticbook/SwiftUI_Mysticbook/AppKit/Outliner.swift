@@ -167,11 +167,6 @@ struct Outliner: NSViewRepresentable {
 					return
 				}
 				
-				// Save the text of the node to be deleted.
-				let nodeToBeDeletedText = node.text
-				
-				print("nodeToBeDeletedText: \(nodeToBeDeletedText)")
-					
 				parent.document.mergeNode(node)
 				
 				outlineView.removeItems(

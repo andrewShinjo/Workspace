@@ -136,6 +136,13 @@ struct Outliner: NSViewRepresentable {
 			
 			private func handleDeleteKey(in textView: NSTextView) {
 				
+				// Only delete the node if the cursor position is zero.
+				guard textView.selectedRange().location == 0
+				else {
+					textView.deleteBackward(nil)
+					return
+				}
+				
 				guard let outlineView = sequence(
 					first: textView as NSTextView?,
 					next: { $0?.superview }

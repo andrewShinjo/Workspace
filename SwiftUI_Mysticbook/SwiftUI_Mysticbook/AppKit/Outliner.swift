@@ -135,6 +135,10 @@ struct Outliner: NSViewRepresentable {
 					handleIndent(in: textView)
 					return true
 				}
+				if commandSelector == #selector(NSResponder.insertBacktab(_:)) {
+					handleUnindent(in: textView)
+					return true
+				}
 				
 				return false
 			}
@@ -149,7 +153,6 @@ struct Outliner: NSViewRepresentable {
 							let node = outlineView.item(
 								atRow: outlineView.row(for: textView)
 							) as? OutlinerNode else {
-					textView.deleteBackward(nil)
 					return
 				}
 				
@@ -162,12 +165,40 @@ struct Outliner: NSViewRepresentable {
 				}
 								
 				// Pass the captured cursor position
-				self.focusNode(
-					in: outlineView,
-					node: node,
-					cursorPosition: textView.selectedRange().location
-				)
+				DispatchQueue.main.async {
+					self.focusNode(
+						in: outlineView,
+						node: node,
+						cursorPosition: textView.selectedRange().location
+					)
+				}
 
+			}
+			
+			private func handleUnindent(in textView: NSTextView) {
+				
+				guard let outlineView = sequence(
+					first: textView as NSTextView?,
+					next: { $0?.superview }
+				)
+					.compactMap({ $0 as? NSOutlineView }).first,
+							let node = outlineView.item(
+								atRow: outlineView.row(for: textView)
+							) as? OutlinerNode else {
+					return
+				}
+				
+				parent.document.unindentNode(node)
+				outlineView.reloadData()
+				
+				// Using DispatchQueue b/c the focus didn't work without it.
+				DispatchQueue.main.async {
+					self.focusNode(
+						in: outlineView,
+						node: node,
+						cursorPosition: textView.selectedRange().location
+					)
+				}
 			}
 			
 			private func focusNode(in outlineView: NSOutlineView, node: OutlinerNode, cursorPosition: Int? = nil) {

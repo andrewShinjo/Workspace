@@ -22,9 +22,8 @@ struct ContentView: View {
 		
 		// A view that presents views in two or three columns.
 		NavigationSplitView(columnVisibility: $columnVisibility) {
-			List {
-				Label("NavigationSplitView", systemImage: "list.bullet")
-			}
+			FileExplorerView()
+				.frame(minWidth: 200)
 		} detail: {
 			Outliner(document: OutlinerDocument(rootNode: rootNode))
 		}

@@ -9,16 +9,25 @@ import SwiftUI
 
 struct ContentView: View {
 	
-	@State private var focused = Set<UUID>()
+	// Sets the visibility of columns in a navigation split view.
+	// detailOnly means only show the detail area initially.
+	@State private var columnVisibility = NavigationSplitViewVisibility.detailOnly
 	
 	let rootNode = OutlinerNode(
 	 text: "Root node",
 	 children: [OutlinerNode(text: "Child")]
  )
 	 
-		
 	var body: some View {
-		Outliner(document: OutlinerDocument(rootNode: rootNode))
+		
+		// A view that presents views in two or three columns.
+		NavigationSplitView(columnVisibility: $columnVisibility) {
+			List {
+				Label("NavigationSplitView", systemImage: "list.bullet")
+			}
+		} detail: {
+			Outliner(document: OutlinerDocument(rootNode: rootNode))
+		}
 	}
 }
 

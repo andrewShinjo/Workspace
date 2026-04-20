@@ -154,12 +154,8 @@ struct Outliner: NSViewRepresentable {
 				
 				parent.document.indentNode(node)
 				outlineView.reloadData()
-				
-				// TODO Focus after indent
-				
-				DispatchQueue.main.async {
-					self.focusNode(in: outlineView, node: node, cursorAtEnd: false)
-				}
+								
+				self.focusNode(in: outlineView, node: node, cursorAtEnd: false)
 
 			}
 			
@@ -222,9 +218,14 @@ struct Outliner: NSViewRepresentable {
 				// (1) Set focus on parent
 				// (2) Set focus on previous sibling
 				
-				let focusRow = (childIndex == 0) ?
-				outlineView.row(forItem: nodeParent) :
-				outlineView.row(forItem: nodeParent.children[childIndex - 1])
+				let nodeToFocus = if childIndex == 0 {
+					nodeParent
+				}
+				else {
+					nodeParent.children[childIndex - 1]
+				}
+				
+				let focusRow = outlineView.row(forItem: nodeToFocus)
 				
 				// Reload the data to update the view.
 				outlineView.reloadData(
@@ -232,16 +233,7 @@ struct Outliner: NSViewRepresentable {
 					columnIndexes: IndexSet(integer: 0)
 				)
 				
-				let cellView = outlineView.view(
-					atColumn: 0,
-					row: focusRow,
-					makeIfNecessary: false
-				)
-				as? NSTableCellView
-				let focusedTextView = cellView?.subviews.first(where: { $0 is NSTextView })
-				as? NSTextView
-				
-				outlineView.window?.makeFirstResponder(focusedTextView)
+				self.focusNode(in: outlineView, node: nodeToFocus, cursorAtEnd: true)
 			}
 			
 			// When the return key is pressed in a text view, we will split the
@@ -311,18 +303,7 @@ struct Outliner: NSViewRepresentable {
 				// Set focus.
 				
 				let newNode = parent.children[index]
-				let focusRow = outlineView.row(forItem: newNode)
-				let cellView = outlineView.view(
-					atColumn: 0,
-					row: focusRow,
-					makeIfNecessary: false
-				)
-				as? NSTableCellView
-				let textView = cellView?.subviews.first(where: { $0 is NSTextView })
-				as? NSTextView
-
-				outlineView.window?.makeFirstResponder(textView)
-				textView!.setSelectedRange(NSRange(location: 0, length: 0))
+				self.focusNode(in: outlineView, node: newNode, cursorAtEnd: false)
 			}
 
 			/// NSOutlineViewDelegate

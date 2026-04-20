@@ -141,9 +141,6 @@ struct Outliner: NSViewRepresentable {
 			
 			private func handleIndent(in textView: NSTextView) {
 				
-				// Capture current cursor position BEFORE any changes
-				let cursorPosition = textView.selectedRange().location
-				
 				guard let outlineView = sequence(
 					first: textView as NSTextView?,
 					next: { $0?.superview }
@@ -165,7 +162,11 @@ struct Outliner: NSViewRepresentable {
 				}
 								
 				// Pass the captured cursor position
-				self.focusNode(in: outlineView, node: node, cursorPosition: cursorPosition)
+				self.focusNode(
+					in: outlineView,
+					node: node,
+					cursorPosition: textView.selectedRange().location
+				)
 
 			}
 			
@@ -242,9 +243,11 @@ struct Outliner: NSViewRepresentable {
 					columnIndexes: IndexSet(integer: 0)
 				)
 				
-				// Get the text view for nodeToFocus to know its string length
-				let cursorPosition = nodeToFocus.text.count
-				self.focusNode(in: outlineView, node: nodeToFocus, cursorPosition: cursorPosition)
+				self.focusNode(
+					in: outlineView,
+					node: nodeToFocus,
+					cursorPosition: nodeToFocus.text.count
+				)
 			}
 			
 			// When the return key is pressed in a text view, we will split the

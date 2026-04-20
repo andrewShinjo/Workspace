@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ContentView: View {
 	
+	@State private var columnVisibility = NavigationSplitViewVisibility.detailOnly
 	@State private var focused = Set<UUID>()
 	
 	let rootNode = OutlinerNode(
@@ -18,7 +19,14 @@ struct ContentView: View {
 	 
 		
 	var body: some View {
-		Outliner(document: OutlinerDocument(rootNode: rootNode))
+		NavigationSplitView(columnVisibility: $columnVisibility) {
+			List {
+				Label("NavigationSplitView", systemImage: "list.bullet")
+			}
+		} detail: {
+			Outliner(document: OutlinerDocument(rootNode: rootNode))
+		}
+		
 	}
 }
 

@@ -41,6 +41,45 @@ class OutlinerDocument {
 		node.parent = newParent
 	}
 	
+	func unindentNode(_ node: OutlinerNode) {
+		
+		// If the node is root, can't unindent.
+		guard let parent = node.parent
+		else {
+			return
+		}
+		
+		// If the parent is root, can't unindent.
+		guard let grandparent = parent.parent
+		else {
+			return
+		}
+		
+		guard let currentIndex = parent.children.firstIndex(where: {
+			$0.id == node.id
+		})
+		else {
+			return
+		}
+		
+		// Remove the node from it's current parent's children list.
+		parent.children.remove(at: currentIndex)
+		
+		// Add the node to the grandparent's children list.
+		guard let parentCurrentIndex = grandparent.children.firstIndex(where: {
+			$0.id == parent.id
+		})
+		else {
+			return
+		}
+		
+		grandparent.children.insert(node, at: parentCurrentIndex + 1)
+		
+		// Update the node's new parent.
+		node.parent = grandparent
+		
+	}
+	
 	func mergeNode(_ node: OutlinerNode) {
 		
 		guard let parent = node.parent else {

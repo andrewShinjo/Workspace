@@ -215,6 +215,14 @@ struct Outliner: NSViewRepresentable {
 					return
 				}
 				
+				// Store the original text length before merging
+				let originalTextLength = if childIndex == 0 {
+					nodeParent.text.count
+				}
+				else {
+					nodeParent.children[childIndex - 1].text.count
+				}
+				
 				parent.document.mergeNode(node)
 				
 				outlineView.removeItems(
@@ -246,7 +254,7 @@ struct Outliner: NSViewRepresentable {
 				self.focusNode(
 					in: outlineView,
 					node: nodeToFocus,
-					cursorPosition: nodeToFocus.text.count
+					cursorPosition: originalTextLength
 				)
 			}
 			

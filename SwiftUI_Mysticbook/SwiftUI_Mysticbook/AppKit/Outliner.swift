@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AppKit
 
 struct Outliner: NSViewRepresentable {
 	
@@ -154,6 +155,11 @@ struct Outliner: NSViewRepresentable {
 				
 				parent.document.indentNode(node)
 				outlineView.reloadData()
+				
+				// Expand the new parent if collapsed so that the indented node is visible
+				if let newParent = node.parent, !outlineView.isItemExpanded(newParent) {
+					outlineView.expandItem(newParent)
+				}
 								
 				self.focusNode(in: outlineView, node: node, cursorAtEnd: false)
 

@@ -161,11 +161,16 @@ struct Outliner: NSViewRepresentable {
 					outlineView.expandItem(newParent)
 				}
 								
-				self.focusNode(in: outlineView, node: node, cursorAtEnd: false)
+				// Pass the captured cursor position
+				self.focusNode(
+					in: outlineView,
+					node: node,
+					cursorPosition: textView.selectedRange().location
+				)
 
 			}
 			
-			private func focusNode(in outlineView: NSOutlineView, node: OutlinerNode, cursorAtEnd: Bool) {
+			private func focusNode(in outlineView: NSOutlineView, node: OutlinerNode, cursorPosition: Int? = nil) {
 				let row = outlineView.row(forItem: node)
 				guard row != -1,
 							let cellView = outlineView.view(atColumn: 0, row: row, makeIfNecessary: false) as? NSTableCellView,
@@ -173,7 +178,7 @@ struct Outliner: NSViewRepresentable {
 						return
 				}
 				outlineView.window?.makeFirstResponder(textView)
-				let position = cursorAtEnd ? textView.string.count : 0
+				let position = cursorPosition ?? 0
 				textView.setSelectedRange(NSRange(location: position, length: 0))
 			}
 
@@ -238,7 +243,11 @@ struct Outliner: NSViewRepresentable {
 					columnIndexes: IndexSet(integer: 0)
 				)
 				
-				self.focusNode(in: outlineView, node: nodeToFocus, cursorAtEnd: true)
+				self.focusNode(
+					in: outlineView,
+					node: nodeToFocus,
+					cursorPosition: nodeToFocus.text.count
+				)
 			}
 			
 			// When the return key is pressed in a text view, we will split the
@@ -308,7 +317,7 @@ struct Outliner: NSViewRepresentable {
 				// Set focus.
 				
 				let newNode = parent.children[index]
-				self.focusNode(in: outlineView, node: newNode, cursorAtEnd: false)
+				self.focusNode(in: outlineView, node: newNode, cursorPosition: 0)
 			}
 
 			/// NSOutlineViewDelegate

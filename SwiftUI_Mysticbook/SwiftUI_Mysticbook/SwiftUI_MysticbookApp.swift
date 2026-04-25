@@ -9,9 +9,20 @@ import SwiftUI
 
 @main
 struct SwiftUI_MysticbookApp: App {
-    var body: some Scene {
-        WindowGroup {
-            ContentView()
-        }
-    }
+	
+	@State private var showCommandPalette = false
+	
+	var body: some Scene {
+			WindowGroup {
+				ContentView(showCommandPalette: $showCommandPalette)
+			}
+			.commands {
+				CommandGroup(before: .help) {
+					Button("Open Command Palette") {
+						showCommandPalette.toggle()
+					}
+					.keyboardShortcut("/", modifiers: .command)
+				}
+			}
+	}
 }

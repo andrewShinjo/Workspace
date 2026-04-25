@@ -65,12 +65,8 @@ struct FileExplorerView: NSViewRepresentable {
 				return
 			}
 			
-			do {
-				rootItem = FileSystemItem(name: "Documents", path: documentsURL.path, isDirectory: true)
-				loadChildren(for: rootItem!)
-			} catch {
-				print("ERROR: Error accessing Documents: \(error)")
-			}
+			rootItem = FileSystemItem(name: "Documents", path: documentsURL.path, isDirectory: true)
+			loadChildren(for: rootItem!)
 		}
 		
 

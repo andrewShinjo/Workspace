@@ -128,7 +128,11 @@ struct Outliner: NSViewRepresentable {
 				}
 				// If insert new line command is requested, the delegate handles it.
 				if commandSelector == #selector(NSResponder.insertNewline(_:)) {
-					handleReturnKey(in: textView)
+					if let event = NSApp.currentEvent, event.modifierFlags.contains(.shift) {
+						textView.insertNewlineIgnoringFieldEditor(nil)
+					} else {
+						handleReturnKey(in: textView)
+					}
 					return true
 				}
 				if commandSelector == #selector(NSResponder.insertTab(_:)) {

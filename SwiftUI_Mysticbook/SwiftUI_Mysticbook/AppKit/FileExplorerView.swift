@@ -7,8 +7,11 @@
 
 import SwiftUI
 
+/// A view of the file explorer.
 struct FileExplorerView: NSViewRepresentable {
 	
+	// Unique identifier for a user interface element in an macOS application.
+	// It's just an aliased string.
 	let identifier = NSUserInterfaceItemIdentifier("FileExplorerColumn")
 	
 	func makeNSView(context: Context) -> some NSView {
@@ -17,9 +20,16 @@ struct FileExplorerView: NSViewRepresentable {
 		outlineView.delegate = context.coordinator
 		outlineView.headerView = nil
 		
+		// The display characteristics and identifier for a column in a outline
+		// view.
+		// Determines the width (including max and min widths) of its column in the
+		// table view and specifies the column's resizing and editing behavior.
 		let column = NSTableColumn(identifier: identifier)
+		// Set the table column's header's title.
 		column.title = ""
+		// Adds the specified column as the last column of the outline view.
 		outlineView.addTableColumn(column)
+		// The table column in which hierarchical data is displayed.
 		outlineView.outlineTableColumn = column
 		
 		let scrollView = NSScrollView()
@@ -55,35 +65,50 @@ struct FileExplorerView: NSViewRepresentable {
 		
 		override init() {
 			super.init()
-			loadDocumentsDirectory()
-		}
-		
-		private func loadDocumentsDirectory() {
 			let fileManager = FileManager.default
-			guard let documentsURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
+			guard let documentsURL = fileManager.urls(
+				for: .documentDirectory,
+				in: .userDomainMask).first
+			else {
 				print("ERROR: Could not find Documents directory")
 				return
 			}
 			
-			rootItem = FileSystemItem(name: "Documents", path: documentsURL.path, isDirectory: true)
+			rootItem = FileSystemItem(
+				name: "Documents",
+				path: documentsURL.path,
+				isDirectory: true
+			)
 			loadChildren(for: rootItem!)
 		}
 		
-
-		
 		private func loadChildren(for item: FileSystemItem) {
+			// FileManager = An interface to the contents of the file system, and the
+			// primary means of interacting with it.
+			// Lets you examine the contents of the file system and make changes to
+			// it.
+			// Used to locate, create, copy, and move files and directories.
+			// FileManager.default = The shared file manager object for the process.
 			let fileManager = FileManager.default
+			// A value that identifies the location of a resource, such as an item on
+			// a remote server or the path to a local file.
 			let url = URL(fileURLWithPath: item.path)
 			
 			do {
+				// Performs a shallow search of the specified directory and returns
+				// URLs for the contained items.
 				let contents = try fileManager.contentsOfDirectory(
 					at: url,
+					// .isDirectoryKey = A key for determining whether the resource is a
+					// directory.
 					includingPropertiesForKeys: [.isDirectoryKey],
 					options: []
 				)
 				
 				for childURL in contents {
-					let resourceValues = try childURL.resourceValues(forKeys: [.isDirectoryKey])
+					let resourceValues = try childURL.resourceValues(
+						forKeys: [.isDirectoryKey]
+					)
 					let isDirectory = resourceValues.isDirectory ?? false
 					let childItem = FileSystemItem(
 						name: childURL.lastPathComponent,
@@ -96,7 +121,8 @@ struct FileExplorerView: NSViewRepresentable {
 				item.children.sort { a, b in
 					if a.isDirectory && !b.isDirectory { return true }
 					if !a.isDirectory && b.isDirectory { return false }
-					return a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
+					return
+						a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
 				}
 				
 			} catch {
@@ -106,7 +132,10 @@ struct FileExplorerView: NSViewRepresentable {
 			item.childrenLoaded = true
 		}
 		
-		func outlineView(_ outlineView: NSOutlineView, numberOfChildrenOfItem item: Any?) -> Int {
+		func outlineView(
+			_ outlineView: NSOutlineView,
+			numberOfChildrenOfItem item: Any?
+		) -> Int {
 			if item == nil {
 				return rootItem != nil ? 1 : 0
 			}
@@ -120,7 +149,11 @@ struct FileExplorerView: NSViewRepresentable {
 			return fileItem.children.count
 		}
 		
-		func outlineView(_ outlineView: NSOutlineView, child index: Int, ofItem item: Any?) -> Any {
+		func outlineView(
+			_ outlineView: NSOutlineView,
+			child index: Int,
+			ofItem item: Any?
+		) -> Any {
 			if item == nil {
 				return rootItem!
 			}
@@ -128,14 +161,24 @@ struct FileExplorerView: NSViewRepresentable {
 			return fileItem.children[index]
 		}
 		
-		func outlineView(_ outlineView: NSOutlineView, isItemExpandable item: Any) -> Bool {
+		func outlineView(
+			_ outlineView: NSOutlineView,
+			isItemExpandable item: Any
+		) -> Bool {
 			guard let fileItem = item as? FileSystemItem else { return false }
 			return fileItem.isDirectory
 		}
 		
-		func outlineView(_ outlineView: NSOutlineView, viewFor tableColumn: NSTableColumn?, item: Any) -> NSView? {
+		func outlineView(
+			_ outlineView: NSOutlineView,
+			viewFor tableColumn: NSTableColumn?,
+			item: Any
+		) -> NSView? {
 			let cellIdentifier = NSUserInterfaceItemIdentifier("FileCell")
-			var cell = outlineView.makeView(withIdentifier: cellIdentifier, owner: self) as? NSTableCellView
+			var cell = outlineView.makeView(
+				withIdentifier: cellIdentifier,
+				owner: self
+			) as? NSTableCellView
 			
 			if cell == nil {
 				cell = NSTableCellView()
@@ -161,7 +204,6 @@ struct FileExplorerView: NSViewRepresentable {
 					imageView.centerYAnchor.constraint(equalTo: cell!.centerYAnchor),
 					imageView.widthAnchor.constraint(equalToConstant: 16),
 					imageView.heightAnchor.constraint(equalToConstant: 16),
-					
 					textField.leadingAnchor.constraint(equalTo: imageView.trailingAnchor, constant: 4),
 					textField.trailingAnchor.constraint(equalTo: cell!.trailingAnchor, constant: -2),
 					textField.centerYAnchor.constraint(equalTo: cell!.centerYAnchor)

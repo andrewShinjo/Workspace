@@ -23,7 +23,7 @@ struct Outliner: NSViewRepresentable {
 		// from a data source to which it has a weak reference.
 		// NSOutlineViewDataSource has methods an NSOutlineView uses to access the
 		// contents of its data source object.
-		let outlineView = NSOutlineView()
+		let outlineView = TopAlignedOutlineView()
 		
 		// Sets the object that provides the data displayed by the receiver.
 		outlineView.dataSource = context.coordinator

@@ -9,7 +9,8 @@ Apply this skill when asked to review code quality. Only review code changed by 
 
 ## Checklist
 
-1.Extract repeated expressions.
+1. Extract repeated expressions into variables.
+2. Prefer deep modules. A module (function, class, method) should have a simple interface that hides significant implementation complexity.
 
 ---
 

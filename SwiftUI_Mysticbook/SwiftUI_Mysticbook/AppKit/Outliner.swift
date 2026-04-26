@@ -55,7 +55,14 @@ struct Outliner: NSViewRepresentable {
 		return scrollView
 	}
 	
-	func updateNSView(_ nsView: NSViewType, context: Context) {}
+	func updateNSView(_ nsView: NSViewType, context: Context) {
+		guard let scrollView = nsView as? NSScrollView,
+					let outlineView = scrollView.documentView as? NSOutlineView else { return }
+		DispatchQueue.main.async {
+			let rows = IndexSet(integersIn: 0..<outlineView.numberOfRows)
+			outlineView.noteHeightOfRows(withIndexesChanged: rows)
+		}
+	}
 	
 	func makeCoordinator() -> Coordinator {
 		Coordinator(parent: self)
@@ -453,14 +460,14 @@ struct Outliner: NSViewRepresentable {
 					return 14
 				}
 				
-				if outlineView.tableColumns.isEmpty {
-					return 14
-				}
-								
-				print("outlineView::heightOfRowByItem")
-				print("Let's get outline view layout data:")
-				
-				let columnWidth = outlineView.tableColumns[0].width
+			if outlineView.tableColumns.isEmpty {
+				return 14
+			}
+							
+			print("outlineView::heightOfRowByItem")
+			print("Let's get outline view layout data:")
+			
+			let columnWidth = max(outlineView.tableColumns[0].width, outlineView.bounds.width - 20)
 				
 				print("columnWidth: \(columnWidth)")
 				
@@ -488,7 +495,9 @@ struct Outliner: NSViewRepresentable {
 				// - Notifies its layout manager of changes to its characters or
 				//   attributes, which lets the layout managers redisplay the text as
 				//   needed.
-				let textStorage = NSTextStorage(string: node.text)
+				let fontSize: CGFloat = node.isRoot() ? 26 : 13
+			let textStorage = NSTextStorage(string: node.text)
+			textStorage.setAttributes([NSAttributedString.Key.font: NSFont.systemFont(ofSize: fontSize)], range: NSRange(location: 0, length: (node.text as NSString).length))
 				
 				// NSTextContainer
 				// - Used by NSLayoutManager to determine where to break lines, lay out
@@ -527,9 +536,10 @@ struct Outliner: NSViewRepresentable {
 				
 				print("usedRect.height: \(usedRect.height)")
 				
-				// The height is 14 or the height of the text container, whichever is
-				// greater.
-				let result = max(14, usedRect.height)
+			// The height is the line height of the font or the height of the text
+			// container, whichever is greater.
+			let minHeight = ceil(NSFont.systemFont(ofSize: fontSize).boundingRectForFont.height)
+			let result = max(minHeight, usedRect.height)
 				print("Outline View Height Result: \(result)")
 				return result
 			}
@@ -583,9 +593,10 @@ struct Outliner: NSViewRepresentable {
 					return cell
 				}
 				
-				if let node = item as? OutlinerNode {
-					textView.string = node.text
-				}
+			if let node = item as? OutlinerNode {
+				textView.string = node.text
+				textView.font = NSFont.systemFont(ofSize: node.isRoot() ? 26 : 13)
+			}
 				
 				return cell
 			}

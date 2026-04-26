@@ -62,6 +62,16 @@ struct Outliner: NSViewRepresentable {
 			let rows = IndexSet(integersIn: 0..<outlineView.numberOfRows)
 			outlineView.noteHeightOfRows(withIndexesChanged: rows)
 		}
+		let coordinator = context.coordinator
+		if !coordinator.hasExpandedRoot {
+			coordinator.hasExpandedRoot = true
+			let rootNode = coordinator.parent.document.rootNode
+			if !rootNode.children.isEmpty {
+				DispatchQueue.main.async {
+					outlineView.expandItem(rootNode)
+				}
+			}
+		}
 	}
 	
 	func makeCoordinator() -> Coordinator {
@@ -80,9 +90,11 @@ struct Outliner: NSViewRepresentable {
 		
 			let parent: Outliner
 			
-			init(parent: Outliner) {
-				self.parent = parent
-			}
+		init(parent: Outliner) {
+			self.parent = parent
+		}
+		
+		var hasExpandedRoot = false
 			
 			/// NSTextViewDelegate
 			

@@ -306,6 +306,12 @@ struct Outliner: NSViewRepresentable {
 					columnIndexes: IndexSet(integer: 0)
 				)
 				
+				NSAnimationContext.beginGrouping()
+				NSAnimationContext.current.duration = 0
+				outlineView.noteHeightOfRows(
+					withIndexesChanged: IndexSet(integer: focusRow))
+				NSAnimationContext.endGrouping()
+				
 				self.focusNode(
 					in: outlineView,
 					node: nodeToFocus,

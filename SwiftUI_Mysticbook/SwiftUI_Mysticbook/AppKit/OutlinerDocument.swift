@@ -109,16 +109,22 @@ class OutlinerDocument {
 		
 		let isRoot = node.isRoot()
 		let selectedRange = textView.selectedRange()
-		let utf16Offset = selectedRange.location
 		let text = node.text
-		let splitIndex = String.Index(utf16Offset: utf16Offset, in: text)
+		let startIndex = String.Index(utf16Offset: selectedRange.location, in: text)
 		
-		// Get the left and right side of node's string
-		let leftSubstring = node.text.prefix(upTo: splitIndex)
-		let rightSubstring = node.text.suffix(from: splitIndex)
+		let newNode: OutlinerNode
 		
-		node.text = String(leftSubstring)
-		let newNode = OutlinerNode(text: String(rightSubstring))
+		if selectedRange.length > 0 {
+			let endIndex = String.Index(utf16Offset: selectedRange.location + selectedRange.length, in: text)
+			let leftPart = text.prefix(upTo: startIndex)
+			let rightPart = text.suffix(from: endIndex)
+			node.text = String(leftPart + rightPart)
+			newNode = OutlinerNode(text: "")
+		} else {
+			let rightSubstring = text.suffix(from: startIndex)
+			node.text = String(text.prefix(upTo: startIndex))
+			newNode = OutlinerNode(text: String(rightSubstring))
+		}
 		
 		if isRoot {
 			node.children.insert(newNode, at: 0)

@@ -239,7 +239,8 @@ struct Outliner: NSViewRepresentable {
 			private func handleDeleteKey(in textView: NSTextView) {
 				
 				// Only delete the node if the cursor position is zero.
-				guard textView.selectedRange().location == 0
+				let selectedRange = textView.selectedRange()
+				guard selectedRange.location == 0 && selectedRange.length == 0
 				else {
 					textView.deleteBackward(nil)
 					return

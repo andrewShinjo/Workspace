@@ -23,7 +23,7 @@ struct Outliner: NSViewRepresentable {
 		// from a data source to which it has a weak reference.
 		// NSOutlineViewDataSource has methods an NSOutlineView uses to access the
 		// contents of its data source object.
-		let outlineView = TopAlignedOutlineView()
+		let outlineView = CustomOutlineView()
 		
 		// Sets the object that provides the data displayed by the receiver.
 		outlineView.dataSource = context.coordinator
@@ -234,6 +234,25 @@ struct Outliner: NSViewRepresentable {
 				outlineView.window?.makeFirstResponder(textView)
 				let position = cursorPosition ?? 0
 				textView.setSelectedRange(NSRange(location: position, length: 0))
+			}
+
+			@objc private func toggleExpandCollapse(_ sender: NSButton) {
+				guard let cellView = sender.superview as? NSTableCellView,
+							let outlineView = sequence(
+						first: cellView as NSView?,
+						next: { $0?.superview }
+					)
+						.compactMap({ $0 as? NSOutlineView }).first
+				else { return }
+
+				let row = outlineView.row(for: cellView)
+				guard row != -1, let item = outlineView.item(atRow: row) else { return }
+
+				if outlineView.isItemExpanded(item) {
+					outlineView.collapseItem(item)
+				} else {
+					outlineView.expandItem(item)
+				}
 			}
 
 			private func handleDeleteKey(in textView: NSTextView) {
@@ -449,7 +468,7 @@ struct Outliner: NSViewRepresentable {
 				_ outlineView: NSOutlineView,
 				shouldShowOutlineCellForItem item: Any
 			) -> Bool {
-				true
+				false
 			}
 			
 			func outlineView(
@@ -578,10 +597,17 @@ struct Outliner: NSViewRepresentable {
 					cell = NSTableCellView()
 					cell?.identifier = cellIdentifier
 					
+					let expander = NSButton()
+					expander.tag = 100
+					expander.bezelStyle = .roundedDisclosure
+					expander.setButtonType(.toggle)
+					expander.target = self
+					expander.action = #selector(toggleExpandCollapse(_:))
+					expander.translatesAutoresizingMaskIntoConstraints = false
+					
 					let textView = NSTextView()
 					textView.delegate = self
 					
-					// Inset is padding around the text view.
 					textView.textContainerInset = .zero
 					textView.textContainer?.lineFragmentPadding = 0
 					textView.isVerticallyResizable = true
@@ -591,9 +617,15 @@ struct Outliner: NSViewRepresentable {
 					
 					textView.translatesAutoresizingMaskIntoConstraints = false
 					cell?.addSubview(textView)
+					cell?.addSubview(expander)
 					
 					NSLayoutConstraint.activate([
-						textView.leadingAnchor.constraint(equalTo: cell!.leadingAnchor),
+						expander.leadingAnchor.constraint(equalTo: cell!.leadingAnchor),
+						expander.topAnchor.constraint(equalTo: cell!.topAnchor),
+						expander.widthAnchor.constraint(equalToConstant: 20),
+						expander.heightAnchor.constraint(equalToConstant: 20),
+						
+						textView.leadingAnchor.constraint(equalTo: cell!.leadingAnchor, constant: 24),
 						textView.trailingAnchor.constraint(equalTo: cell!.trailingAnchor),
 						textView.topAnchor.constraint(equalTo: cell!.topAnchor),
 						textView.bottomAnchor.constraint(equalTo: cell!.bottomAnchor)
@@ -615,6 +647,14 @@ struct Outliner: NSViewRepresentable {
 			if let node = item as? OutlinerNode {
 				textView.string = node.text
 				textView.font = NSFont.systemFont(ofSize: node.isRoot() ? 26 : 13)
+				
+				if let expander = cell?.viewWithTag(100) as? NSButton {
+					let isExpandable = !node.children.isEmpty
+					expander.isHidden = !isExpandable
+					if isExpandable {
+						expander.state = outlineView.isItemExpanded(item) ? .on : .off
+					}
+				}
 			}
 				
 				return cell

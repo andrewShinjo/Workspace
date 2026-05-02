@@ -53,6 +53,10 @@ struct Outliner: NSViewRepresentable {
 			if !rootNode.children.isEmpty {
 				DispatchQueue.main.async {
 					outlineView.expandItem(rootNode)
+					let rootRow = outlineView.row(forItem: rootNode)
+					if rootRow >= 0 {
+						outlineView.reloadData(forRowIndexes: IndexSet(integer: rootRow), columnIndexes: IndexSet(integer: 0))
+					}
 				}
 			}
 		}
@@ -418,9 +422,15 @@ struct Outliner: NSViewRepresentable {
 				return cell
 			}
 
-			if let node = item as? OutlinerNode {
-				textView.string = node.text
-				textView.font = NSFont.systemFont(ofSize: node.isRoot() ? 26 : 13)
+			guard let node = item as? OutlinerNode else { return cell }
+
+			textView.string = node.text
+			textView.font = NSFont.systemFont(ofSize: node.isRoot() ? 26 : 13)
+
+			if let outlinerCell = cell as? OutlinerCellView {
+				let hasChildren = !node.children.isEmpty
+				outlinerCell.customDisclosureButton?.isHidden = !hasChildren
+				outlinerCell.setExpanded(outlineView.isItemExpanded(node))
 			}
 
 			return cell

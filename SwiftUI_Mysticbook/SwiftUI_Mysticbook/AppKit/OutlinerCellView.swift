@@ -16,7 +16,8 @@ class OutlinerCellView: NSTableCellView {
 
 		// Create a custom disclosure button
 		customDisclosureButton = NSButton()
-		customDisclosureButton?.bezelStyle = .disclosure
+		customDisclosureButton?.bezelStyle = .regularSquare
+		customDisclosureButton?.isBordered = false
 		customDisclosureButton?.setButtonType(.momentaryPushIn)
 		customDisclosureButton?.title = ""
 		customDisclosureButton?.target = self
@@ -41,8 +42,28 @@ class OutlinerCellView: NSTableCellView {
 
 	// Removed layout() override – constraints are sufficient
 
+	func setExpanded(_ expanded: Bool) {
+		let symbolName = expanded ? "chevron.down" : "chevron.right"
+		let config = NSImage.SymbolConfiguration(pointSize: 11, weight: .medium)
+		customDisclosureButton?.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)?.withSymbolConfiguration(config)
+		customDisclosureButton?.image?.isTemplate = true
+	}
+
 	@objc func onClick() {
-		print("Click")
-		// Here you would implement expand/collapse logic for your outline view
+		guard let outlineView = sequence(
+			first: self as NSView?,
+			next: { $0?.superview }
+		).compactMap({ $0 as? NSOutlineView }).first else { return }
+
+		let row = outlineView.row(for: self)
+		guard row >= 0, let item = outlineView.item(atRow: row) else { return }
+
+		if outlineView.isItemExpanded(item) {
+			outlineView.collapseItem(item)
+		} else {
+			outlineView.expandItem(item)
+		}
+
+		setExpanded(outlineView.isItemExpanded(item))
 	}
 }

@@ -325,7 +325,10 @@ struct Outliner: NSViewRepresentable {
 		// MARK: - NSOutlineViewDelegate
 
 		func outlineView(_ outlineView: NSOutlineView, shouldExpandItem item: Any) -> Bool { true }
-		func outlineView(_ outlineView: NSOutlineView, shouldCollapseItem item: Any) -> Bool { true }
+		func outlineView(_ outlineView: NSOutlineView, shouldCollapseItem item: Any) -> Bool {
+			guard let node = item as? OutlinerNode else { return true }
+			return !node.isRoot()
+		}
 		func outlineView(_ outlineView: NSOutlineView, shouldSelect tableColumn: NSTableColumn?) -> Bool { true }
 		func outlineView(_ outlineView: NSOutlineView, shouldSelectItem item: Any) -> Bool { true }
 
@@ -429,7 +432,7 @@ struct Outliner: NSViewRepresentable {
 
 			if let outlinerCell = cell as? OutlinerCellView {
 				let hasChildren = !node.children.isEmpty
-				outlinerCell.customDisclosureButton?.isHidden = !hasChildren
+				outlinerCell.customDisclosureButton?.isHidden = !hasChildren || node.isRoot()
 				outlinerCell.setExpanded(outlineView.isItemExpanded(node))
 			}
 

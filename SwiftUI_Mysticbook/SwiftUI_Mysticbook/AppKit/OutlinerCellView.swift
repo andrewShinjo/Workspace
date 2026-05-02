@@ -10,6 +10,7 @@ import AppKit
 class OutlinerCellView: NSTableCellView {
 
 	var customDisclosureButton: NSButton?
+	var bulletLabel: NSTextField?
 
 	override init(frame frameRect: NSRect) {
 		super.init(frame: frameRect)
@@ -34,13 +35,24 @@ class OutlinerCellView: NSTableCellView {
 			customDisclosureButton!.widthAnchor.constraint(equalToConstant: 16),
 			customDisclosureButton!.heightAnchor.constraint(equalToConstant: 16)
 		])
+
+		// Bullet point label
+		let bullet = NSTextField(labelWithString: "•")
+		bullet.font = NSFont.systemFont(ofSize: 13)
+		bullet.textColor = NSColor.secondaryLabelColor
+		bullet.translatesAutoresizingMaskIntoConstraints = false
+		addSubview(bullet)
+		NSLayoutConstraint.activate([
+			bullet.leadingAnchor.constraint(equalTo: customDisclosureButton!.trailingAnchor, constant: 4),
+			bullet.centerYAnchor.constraint(equalTo: centerYAnchor),
+			bullet.widthAnchor.constraint(equalToConstant: 10)
+		])
+		bulletLabel = bullet
 	}
 
 	required init?(coder: NSCoder) {
 		super.init(coder: coder)
 	}
-
-	// Removed layout() override – constraints are sufficient
 
 	func setExpanded(_ expanded: Bool) {
 		let symbolName = expanded ? "chevron.down" : "chevron.right"

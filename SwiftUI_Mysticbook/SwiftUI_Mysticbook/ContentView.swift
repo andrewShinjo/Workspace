@@ -9,19 +9,25 @@ import SwiftUI
 
 struct ContentView: View {
 
-	@State private var columnVisibility = NavigationSplitViewVisibility.detailOnly
+	@State private var columnVisibility = NavigationSplitViewVisibility.all
 	@Binding var showCommandPalette: Bool
-	@Binding var document: OutlinerDocument
+	@StateObject var workspace: Workspace
 
 	var body: some View {
 
 		ZStack {
 			NavigationSplitView(columnVisibility: $columnVisibility) {
-				List {
-					Label("NavigationSplitView", systemImage: "list.bullet")
-				}
+				WorkspaceFileList(workspace: workspace)
 			} detail: {
-				Outliner(document: document)
+				if let doc = workspace.currentDocument {
+					Outliner(document: doc, saveURL: workspace.currentFileURL)
+				} else {
+					ContentUnavailableView(
+						"Select a File",
+						systemImage: "doc.text",
+						description: Text("Choose an Org file from the sidebar.")
+					)
+				}
 			}
 
 			if showCommandPalette {
@@ -35,7 +41,5 @@ struct ContentView: View {
 }
 
 #Preview {
-	ContentView(showCommandPalette: .constant(false), document: .constant(OutlinerDocument(
-		rootNode: OutlinerNode(text: "Root node", children: [OutlinerNode(text: "Child")])
-	)))
+	ContentView(showCommandPalette: .constant(false), workspace: Workspace())
 }

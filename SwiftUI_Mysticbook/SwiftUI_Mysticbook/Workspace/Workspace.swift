@@ -1,0 +1,66 @@
+import Foundation
+import Combine
+
+final class Workspace: ObservableObject {
+    @Published var directoryURL: URL?
+    @Published var fileItems: [FileItem] = []
+    @Published var selectedFileURL: URL?
+    @Published var currentDocument: OutlinerDocument?
+    @Published var currentFileURL: URL?
+
+    private let scanner = FileTreeScanner()
+    private let watcher = DirectoryWatcher()
+    private var observers: Set<AnyCancellable> = []
+
+    private static let savedPathKey = "workspaceDirectoryPath"
+
+    // MARK: - Directory management
+
+    func setDirectory(_ url: URL) {
+        UserDefaults.standard.set(url.path, forKey: Self.savedPathKey)
+        watcher.start(url: url) { [weak self] in
+            DispatchQueue.main.async { self?.rebuildTree() }
+        }
+        DispatchQueue.main.async {
+            self.directoryURL = url
+            self.rebuildTree()
+        }
+    }
+
+    func restoreSavedDirectory() {
+        guard let path = UserDefaults.standard.string(forKey: Self.savedPathKey),
+              FileManager.default.fileExists(atPath: path) else { return }
+        setDirectory(URL(filePath: path))
+    }
+
+    // MARK: - File operations
+
+    func selectFile(at url: URL) {
+        guard url != currentFileURL else { return }
+        var isDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir),
+              !isDir.boolValue else { return }
+        let document = try? orgDeserialize(String(contentsOf: url))
+        DispatchQueue.main.async {
+            self.currentFileURL = url
+            self.selectedFileURL = url
+            self.currentDocument = document
+            if document == nil { self.currentFileURL = nil }
+        }
+    }
+
+    func autoSave() {
+        guard let document = currentDocument, let url = currentFileURL else { return }
+        let text = orgSerialize(document)
+        DispatchQueue.global(qos: .background).async {
+            try? text.write(to: url, atomically: true, encoding: .utf8)
+        }
+    }
+
+    // MARK: - Private
+
+    private func rebuildTree() {
+        guard let directoryURL else { return }
+        fileItems = (try? scanner.scan(directory: directoryURL)) ?? []
+    }
+}

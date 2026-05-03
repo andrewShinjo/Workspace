@@ -11,6 +11,7 @@ import AppKit
 struct Outliner: NSViewRepresentable {
 
 	var document: OutlinerDocument
+	var saveURL: URL?
 	let identifier = NSUserInterfaceItemIdentifier("MainColumn")
 
 	func makeNSView(context: Context) -> some NSView {
@@ -109,7 +110,9 @@ struct Outliner: NSViewRepresentable {
 			if let node = outlineView.item(atRow: rowIndex) as? OutlinerNode,
 				 node.text != textView.string {
 				node.text = textView.string
-				autoSave(document: parent.document)
+				if let url = parent.saveURL {
+				autoSave(document: parent.document, to: url)
+			}
 				NSAnimationContext.beginGrouping()
 				NSAnimationContext.current.duration = 0
 				outlineView.noteHeightOfRows(withIndexesChanged: IndexSet(integer: rowIndex))

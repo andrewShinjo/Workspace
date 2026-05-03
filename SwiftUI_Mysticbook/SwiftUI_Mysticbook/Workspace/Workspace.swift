@@ -57,6 +57,46 @@ final class Workspace: ObservableObject {
         }
     }
 
+    // MARK: - File rename
+
+    func renameFile(at url: URL, to newName: String) {
+        let cleanName = newName.hasSuffix(".org") ? String(newName.dropLast(4)) : newName
+        let newURL = url
+            .deletingLastPathComponent()
+            .appendingPathComponent(cleanName)
+            .appendingPathExtension("org")
+        guard url != newURL, !FileManager.default.fileExists(atPath: newURL.path) else { return }
+
+        try? FileManager.default.moveItem(at: url, to: newURL)
+        rebuildTree()
+
+        if url == currentFileURL {
+            currentFileURL = newURL
+            selectedFileURL = newURL
+        }
+    }
+
+    // MARK: - New file
+
+    func createNewFile() {
+        guard let directoryURL else { return }
+        let fm = FileManager.default
+        var index = 0
+        let baseName = "untitled"
+        var fileURL: URL
+        repeat {
+            let suffix = index == 0 ? "" : " \(index)"
+            fileURL = directoryURL.appendingPathComponent("\(baseName)\(suffix).org")
+            index += 1
+        } while fm.fileExists(atPath: fileURL.path)
+
+        let emptyDoc = OutlinerDocument(rootNode: OutlinerNode(text: ""))
+        let content = orgSerialize(emptyDoc)
+        try? content.write(to: fileURL, atomically: true, encoding: .utf8)
+        rebuildTree()
+        selectFile(at: fileURL)
+    }
+
     // MARK: - Private
 
     private func rebuildTree() {

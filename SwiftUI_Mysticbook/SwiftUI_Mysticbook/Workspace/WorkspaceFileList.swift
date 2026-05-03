@@ -4,6 +4,9 @@ import UniformTypeIdentifiers
 struct WorkspaceFileList: View {
     @ObservedObject var workspace: Workspace
     @State private var selectedURL: URL?
+    @State private var showRenameAlert = false
+    @State private var renameText = ""
+    @State private var renamingURL: URL?
 
     var body: some View {
         if workspace.directoryURL == nil {
@@ -68,11 +71,27 @@ struct WorkspaceFileList: View {
                     .selectionDisabled(true)
             } else {
                 Label(item.name, systemImage: "doc.text")
+                    .contextMenu {
+                        Button("Rename\u{2026}") {
+                            renamingURL = item.url
+                            renameText = item.name.replacingOccurrences(of: ".org", with: "")
+                            showRenameAlert = true
+                        }
+                    }
             }
         }
         .onChange(of: selectedURL) { _, newValue in
             guard let url = newValue else { return }
             workspace.selectFile(at: url)
+        }
+        .alert("Rename File", isPresented: $showRenameAlert) {
+            TextField("File name", text: $renameText)
+            Button("Cancel", role: .cancel) { }
+            Button("Rename") {
+                if let url = renamingURL {
+                    workspace.renameFile(at: url, to: renameText)
+                }
+            }
         }
         .navigationTitle(workspace.directoryURL?.lastPathComponent ?? "Workspace")
         .toolbar {

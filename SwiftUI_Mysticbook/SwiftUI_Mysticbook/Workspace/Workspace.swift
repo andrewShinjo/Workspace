@@ -57,6 +57,25 @@ final class Workspace: ObservableObject {
         }
     }
 
+    // MARK: - File rename
+
+    func renameFile(at url: URL, to newName: String) {
+        let cleanName = newName.hasSuffix(".org") ? String(newName.dropLast(4)) : newName
+        let newURL = url
+            .deletingLastPathComponent()
+            .appendingPathComponent(cleanName)
+            .appendingPathExtension("org")
+        guard url != newURL, !FileManager.default.fileExists(atPath: newURL.path) else { return }
+
+        try? FileManager.default.moveItem(at: url, to: newURL)
+        rebuildTree()
+
+        if url == currentFileURL {
+            currentFileURL = newURL
+            selectedFileURL = newURL
+        }
+    }
+
     // MARK: - New file
 
     func createNewFile() {

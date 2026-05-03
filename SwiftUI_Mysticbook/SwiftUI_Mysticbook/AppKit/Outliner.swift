@@ -401,9 +401,9 @@ struct Outliner: NSViewRepresentable {
 					newCell.addSubview(textView)
 				}
 
-				// Leave room for the disclosure button (20 points)
+				// Leave room for disclosure button + bullet (36 points)
 				NSLayoutConstraint.activate([
-					textView.leadingAnchor.constraint(equalTo: newCell.leadingAnchor, constant: 20),
+					textView.leadingAnchor.constraint(equalTo: newCell.leadingAnchor, constant: 36),
 					textView.trailingAnchor.constraint(equalTo: newCell.trailingAnchor),
 					textView.topAnchor.constraint(equalTo: newCell.topAnchor),
 					textView.bottomAnchor.constraint(equalTo: newCell.bottomAnchor)
@@ -433,6 +433,7 @@ struct Outliner: NSViewRepresentable {
 			if let outlinerCell = cell as? OutlinerCellView {
 				let hasChildren = !node.children.isEmpty
 				outlinerCell.customDisclosureButton?.isHidden = !hasChildren || node.isRoot()
+				outlinerCell.bulletLabel?.isHidden = node.isRoot()
 				outlinerCell.setExpanded(outlineView.isItemExpanded(node))
 			}
 

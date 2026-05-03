@@ -21,9 +21,6 @@ func orgSerialize(_ document: OutlinerDocument) -> String {
     }
 
     for child in document.rootNode.children {
-        if !lines.isEmpty {
-            lines.append("")
-        }
         lines.append(contentsOf: serializeNode(child, depth: 1))
     }
 
@@ -49,9 +46,6 @@ private func serializeNode(_ node: OutlinerNode, depth: Int) -> [String] {
         lines.append(parts.body)
     }
     for child in node.children {
-        if !lines.isEmpty {
-            lines.append("")
-        }
         lines.append(contentsOf: serializeNode(child, depth: depth + 1))
     }
     return lines

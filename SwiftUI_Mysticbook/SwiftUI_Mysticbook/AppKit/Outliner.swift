@@ -10,7 +10,7 @@ import AppKit
 
 struct Outliner: NSViewRepresentable {
 
-	let document: OutlinerDocument
+	var document: OutlinerDocument
 	let identifier = NSUserInterfaceItemIdentifier("MainColumn")
 
 	func makeNSView(context: Context) -> some NSView {
@@ -42,6 +42,15 @@ struct Outliner: NSViewRepresentable {
 	func updateNSView(_ nsView: NSViewType, context: Context) {
 		guard let scrollView = nsView as? NSScrollView,
 					let outlineView = scrollView.documentView as? NSOutlineView else { return }
+
+		context.coordinator.parent = self
+
+		if context.coordinator.lastDocument !== document {
+			context.coordinator.lastDocument = document
+			context.coordinator.hasExpandedRoot = false
+			outlineView.reloadData()
+		}
+
 		DispatchQueue.main.async {
 			let rows = IndexSet(integersIn: 0..<outlineView.numberOfRows)
 			outlineView.noteHeightOfRows(withIndexesChanged: rows)
@@ -49,7 +58,7 @@ struct Outliner: NSViewRepresentable {
 		let coordinator = context.coordinator
 		if !coordinator.hasExpandedRoot {
 			coordinator.hasExpandedRoot = true
-			let rootNode = coordinator.parent.document.rootNode
+			let rootNode = document.rootNode
 			if !rootNode.children.isEmpty {
 				DispatchQueue.main.async {
 					outlineView.expandItem(rootNode)
@@ -72,13 +81,14 @@ struct Outliner: NSViewRepresentable {
 		NSOutlineViewDelegate,
 		NSOutlineViewDataSource {
 
-		let parent: Outliner
+		var parent: Outliner
 
 		init(parent: Outliner) {
 			self.parent = parent
 		}
 
 		var hasExpandedRoot = false
+		var lastDocument: OutlinerDocument?
 
 		// MARK: - NSTextViewDelegate
 
@@ -99,6 +109,7 @@ struct Outliner: NSViewRepresentable {
 			if let node = outlineView.item(atRow: rowIndex) as? OutlinerNode,
 				 node.text != textView.string {
 				node.text = textView.string
+				autoSave(document: parent.document)
 				NSAnimationContext.beginGrouping()
 				NSAnimationContext.current.duration = 0
 				outlineView.noteHeightOfRows(withIndexesChanged: IndexSet(integer: rowIndex))

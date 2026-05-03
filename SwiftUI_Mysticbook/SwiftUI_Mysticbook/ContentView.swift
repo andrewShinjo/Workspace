@@ -8,29 +8,22 @@
 import SwiftUI
 
 struct ContentView: View {
-	
-	// Sets the visibility of columns in a navigation split view.
-	// detailOnly means only show the detail area initially.
+
 	@State private var columnVisibility = NavigationSplitViewVisibility.detailOnly
 	@Binding var showCommandPalette: Bool
-	
-	let rootNode = OutlinerNode(
-	 text: "Root node",
-	 children: [OutlinerNode(text: "Child")]
- )
-	 
+	@Binding var document: OutlinerDocument
+
 	var body: some View {
-		
+
 		ZStack {
-			// A view that presents views in two or three columns.
 			NavigationSplitView(columnVisibility: $columnVisibility) {
 				List {
 					Label("NavigationSplitView", systemImage: "list.bullet")
 				}
 			} detail: {
-				Outliner(document: OutlinerDocument(rootNode: rootNode))
+				Outliner(document: document)
 			}
-			
+
 			if showCommandPalette {
 				CommandPaletteView(isPresented: $showCommandPalette)
 					.transition(.move(edge: .top).combined(with: .opacity))
@@ -42,5 +35,7 @@ struct ContentView: View {
 }
 
 #Preview {
-	ContentView(showCommandPalette: .constant(false))
+	ContentView(showCommandPalette: .constant(false), document: .constant(OutlinerDocument(
+		rootNode: OutlinerNode(text: "Root node", children: [OutlinerNode(text: "Child")])
+	)))
 }

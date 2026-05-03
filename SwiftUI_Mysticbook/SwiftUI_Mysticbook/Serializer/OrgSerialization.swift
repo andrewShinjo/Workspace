@@ -73,54 +73,68 @@ func orgDeserialize(_ text: String) -> OutlinerDocument {
 
     for line in lines {
         if line.trimmingCharacters(in: .whitespaces).lowercased().hasPrefix("#+title:") {
-            let titleStr = String(line.dropFirst("#+title:".count)).trimmingCharacters(in: .whitespaces)
+            let titleStr = String(
+							line.dropFirst("#+title:".count)
+						).trimmingCharacters(in: .whitespaces)
             rootNode.text = titleStr
             continue
         }
 
         if line.hasPrefix("*") {
-            foundFirstHeading = true
-            let starCount = line.prefix(while: { $0 == "*" }).count
-            let headingText = String(line.dropFirst(starCount)).trimmingCharacters(in: .whitespaces)
+					foundFirstHeading = true
+					while currentNode.text.hasSuffix("\n") {
+						currentNode.text = String(currentNode.text.dropLast())
+					}
+					let starCount = line.prefix(while: { $0 == "*" }).count
+					let headingText = String(line.dropFirst(starCount))
+						.trimmingCharacters(in: .whitespaces)
 
-            let newNode = OutlinerNode(text: headingText)
+					let newNode = OutlinerNode(text: headingText)
 
-            while let last = depthStack.last, last.depth >= starCount {
-                depthStack.removeLast()
-            }
+					while let last = depthStack.last, last.depth >= starCount {
+						depthStack.removeLast()
+					}
 
-            if let parentNode = depthStack.last?.node {
-                parentNode.children.append(newNode)
-                newNode.parent = parentNode
-            } else {
-                rootNode.children.append(newNode)
-                newNode.parent = rootNode
-            }
+					if let parentNode = depthStack.last?.node {
+						parentNode.children.append(newNode)
+						newNode.parent = parentNode
+					} else {
+						rootNode.children.append(newNode)
+						newNode.parent = rootNode
+					}
 
-            depthStack.append((starCount, newNode))
-            currentNode = newNode
+					depthStack.append((starCount, newNode))
+					currentNode = newNode
         } else {
-            if foundFirstHeading {
-                if currentNode.text.isEmpty {
-                    if !line.isEmpty {
-                        currentNode.text = line
-                    }
-                } else {
-                    currentNode.text += "\n" + line
-                }
-            } else {
-                if !line.isEmpty {
-                    if rootNode.text.isEmpty {
-                        rootNode.text = line
-                    } else {
-                        rootNode.text += "\n" + line
-                    }
-                }
-            }
+					if foundFirstHeading {
+							if currentNode.text.isEmpty {
+									if !line.isEmpty {
+											currentNode.text = line
+									}
+							} else {
+									currentNode.text += "\n" + line
+							}
+					} else {
+							if !line.isEmpty {
+									if rootNode.text.isEmpty {
+											rootNode.text = line
+									} else {
+											rootNode.text += "\n" + line
+									}
+							}
+					}
         }
     }
 
-    rootNode.text = rootNode.text.trimmingCharacters(in: .whitespacesAndNewlines)
+    func trimTrailingNewlines(_ node: OutlinerNode) {
+        while node.text.hasSuffix("\n") {
+            node.text = String(node.text.dropLast())
+        }
+        for child in node.children {
+            trimTrailingNewlines(child)
+        }
+    }
+    trimTrailingNewlines(rootNode)
 
     return OutlinerDocument(rootNode: rootNode)
 }

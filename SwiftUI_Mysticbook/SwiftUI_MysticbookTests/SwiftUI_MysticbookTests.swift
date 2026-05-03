@@ -10,8 +10,11 @@ import Testing
 
 struct SwiftUI_MysticbookTests {
 
-    @Test func example() async throws {
-        // Write your test here and use APIs like `#expect(...)` to check expected conditions.
+    @Test func deserializeNoTrailingNewline() {
+        let input = "* A\nbody\n\n* B"
+        let doc = orgDeserialize(input)
+        let nodeA = doc.rootNode.children[0]
+        #expect(nodeA.text == "A\nbody")
     }
 
 }

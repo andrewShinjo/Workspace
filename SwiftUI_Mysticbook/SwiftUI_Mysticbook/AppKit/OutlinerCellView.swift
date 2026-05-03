@@ -44,7 +44,7 @@ class OutlinerCellView: NSTableCellView {
 		addSubview(bullet)
 		NSLayoutConstraint.activate([
 			bullet.leadingAnchor.constraint(equalTo: customDisclosureButton!.trailingAnchor, constant: 4),
-			bullet.centerYAnchor.constraint(equalTo: centerYAnchor),
+			bullet.topAnchor.constraint(equalTo: topAnchor),
 			bullet.widthAnchor.constraint(equalToConstant: 10)
 		])
 		bulletLabel = bullet

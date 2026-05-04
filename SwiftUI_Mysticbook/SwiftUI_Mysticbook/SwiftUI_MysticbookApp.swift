@@ -11,11 +11,16 @@ import SwiftUI
 struct SwiftUI_MysticbookApp: App {
 
 	@State private var showCommandPalette = false
+	@State private var showFlashcardPane = false
 	@StateObject private var workspace = Workspace()
 
 	var body: some Scene {
 			WindowGroup {
-				ContentView(showCommandPalette: $showCommandPalette, workspace: workspace)
+				ContentView(
+					showCommandPalette: $showCommandPalette,
+					showFlashcardPane: $showFlashcardPane,
+					workspace: workspace
+				)
 					.onAppear {
 						DispatchQueue.main.async {
 							workspace.restoreSavedDirectory()
@@ -28,6 +33,11 @@ struct SwiftUI_MysticbookApp: App {
 						showCommandPalette.toggle()
 					}
 					.keyboardShortcut("/", modifiers: .command)
+
+			Button("Show Flashcards") {
+					showFlashcardPane.toggle()
+				}
+				.keyboardShortcut("f", modifiers: [.command, .option])
 				}
 			}
 	}

@@ -106,7 +106,7 @@ extension PanelModel {
 		switch self {
 		case .leaf:
 			return self
-		case .split(let id, let direction, let first, let second, let _):
+		case .split(id: let id, direction: let direction, first: let first, second: let second, fraction: let originalFraction):
 			if id == panelId {
 				return .split(id: id, direction: direction, first: first, second: second, fraction: fraction)
 			}
@@ -115,7 +115,7 @@ extension PanelModel {
 			if newFirst == first && newSecond == second {
 				return self
 			}
-			return .split(id: id, direction: direction, first: newFirst, second: newSecond, fraction: fraction)
+			return .split(id: id, direction: direction, first: newFirst, second: newSecond, fraction: originalFraction)
 		}
 	}
 
@@ -189,6 +189,7 @@ struct PanelView<Content: View>: View {
 	let selectTab: (UUID, Int) -> Void
 	let closeTab: (UUID, Int) -> Void
 	let addTab: (UUID) -> Void
+	let resizeSplit: (UUID, CGFloat) -> Void
 
 	init(
 		rootPanel: PanelModel,
@@ -196,7 +197,8 @@ struct PanelView<Content: View>: View {
 		closePanel: @escaping (UUID) -> Void = { _ in },
 		selectTab: @escaping (UUID, Int) -> Void = { _, _ in },
 		closeTab: @escaping (UUID, Int) -> Void = { _, _ in },
-		addTab: @escaping (UUID) -> Void = { _ in }
+		addTab: @escaping (UUID) -> Void = { _ in },
+		resizeSplit: @escaping (UUID, CGFloat) -> Void = { _, _ in }
 	) {
 		self.rootPanel = rootPanel
 		self.leafContent = leafContent
@@ -204,6 +206,7 @@ struct PanelView<Content: View>: View {
 		self.selectTab = selectTab
 		self.closeTab = closeTab
 		self.addTab = addTab
+		self.resizeSplit = resizeSplit
 	}
 
 	var body: some View {
@@ -282,7 +285,8 @@ struct PanelView<Content: View>: View {
 		GeometryReader { geo in
 			let total = direction == .horizontal ? geo.size.width : geo.size.height
 			let firstSize = total * fraction
-			let secondSize = total - firstSize
+			let divider: CGFloat = 3
+			let secondSize = total - firstSize - divider
 
 			if direction == .horizontal {
 				HStack(spacing: 0) {
@@ -292,18 +296,27 @@ struct PanelView<Content: View>: View {
 						closePanel: closePanel,
 						selectTab: selectTab,
 						closeTab: closeTab,
-						addTab: addTab
+						addTab: addTab,
+						resizeSplit: resizeSplit
 					)
 					.frame(width: firstSize, height: geo.size.height)
+					SplitDivider(
+						direction: direction,
+						total: total,
+						fraction: fraction,
+						splitId: id,
+						onResize: resizeSplit
+					)
 					PanelView(
 						rootPanel: second,
 						leafContent: leafContent,
 						closePanel: closePanel,
 						selectTab: selectTab,
 						closeTab: closeTab,
-						addTab: addTab
+						addTab: addTab,
+						resizeSplit: resizeSplit
 					)
-					.frame(width: secondSize, height: geo.size.height)
+					.frame(width: max(0, secondSize), height: geo.size.height)
 				}
 			}
 			else {
@@ -314,21 +327,72 @@ struct PanelView<Content: View>: View {
 						closePanel: closePanel,
 						selectTab: selectTab,
 						closeTab: closeTab,
-						addTab: addTab
+						addTab: addTab,
+						resizeSplit: resizeSplit
 					)
 					.frame(width: geo.size.width, height: firstSize)
+					SplitDivider(
+						direction: direction,
+						total: total,
+						fraction: fraction,
+						splitId: id,
+						onResize: resizeSplit
+					)
 					PanelView(
 						rootPanel: second,
 						leafContent: leafContent,
 						closePanel: closePanel,
 						selectTab: selectTab,
 						closeTab: closeTab,
-						addTab: addTab
+						addTab: addTab,
+						resizeSplit: resizeSplit
 					)
-					.frame(width: geo.size.width, height: secondSize)
+					.frame(width: geo.size.width, height: max(0, secondSize))
 				}
 			}
 		}
+	}
+}
+
+// MARK: - Split Divider
+
+private struct SplitDivider: View {
+	let direction: SplitDirection
+	let total: CGFloat
+	let fraction: CGFloat
+	let splitId: UUID
+	let onResize: (UUID, CGFloat) -> Void
+
+	@State private var dragStartFraction: CGFloat? = nil
+
+	var body: some View {
+		Color.clear
+			.frame(
+				width: direction == .horizontal ? 8 : nil,
+				height: direction == .vertical ? 8 : nil
+			)
+			.overlay(
+				Rectangle()
+					.fill(Color(nsColor: .separatorColor))
+					.frame(
+						width: direction == .horizontal ? 3 : nil,
+						height: direction == .vertical ? 3 : nil
+					)
+			)
+			.contentShape(Rectangle())
+			.gesture(
+				DragGesture()
+					.onChanged { value in
+						let sf = dragStartFraction ?? fraction
+						dragStartFraction = sf
+						let delta = direction == .horizontal ? value.translation.width : value.translation.height
+						let newFraction = max(0.15, min(0.85, sf + delta / total))
+						onResize(splitId, newFraction)
+					}
+					.onEnded { _ in
+						dragStartFraction = nil
+					}
+			)
 	}
 }
 

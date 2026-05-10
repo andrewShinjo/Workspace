@@ -67,6 +67,7 @@ struct ContentView: View {
 				resizeSplit: { panelVM.resize(splitId: $0, newFraction: $1) },
 				onFocusPanel: { panelVM.activePanelId = $0 },
 				moveTab: { panelVM.moveTab(from: $0, at: $1, to: $2, at: $3) },
+				moveTabToSplit: { panelVM.moveTabToSplit(from: $0, at: $1, to: $2, direction: $3, tabInFirst: $4) },
 				dragState: tabDragState
 			)
 

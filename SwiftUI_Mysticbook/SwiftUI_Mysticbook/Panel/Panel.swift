@@ -110,6 +110,30 @@ extension PanelModel {
 		}
 	}
 
+	func splitLeafAndAddTab(panelId: UUID, direction: SplitDirection, tab: TabItem, tabInFirst: Bool) -> PanelModel {
+		switch self {
+		case .leaf(let id, let tabs, let selectedIndex):
+			guard id == panelId else { return self }
+			let newLeafId = UUID()
+			let existingLeaf: PanelModel = .leaf(id: id, tabs: tabs, selectedTabIndex: selectedIndex)
+			let newLeaf: PanelModel = .leaf(id: newLeafId, tabs: [tab], selectedTabIndex: 0)
+			return .split(
+				id: UUID(),
+				direction: direction,
+				first: tabInFirst ? newLeaf : existingLeaf,
+				second: tabInFirst ? existingLeaf : newLeaf,
+				fraction: 0.5
+			)
+		case .split(let id, let splitDir, let first, let second, let fraction):
+			let newFirst = first.splitLeafAndAddTab(panelId: panelId, direction: direction, tab: tab, tabInFirst: tabInFirst)
+			let newSecond = second.splitLeafAndAddTab(panelId: panelId, direction: direction, tab: tab, tabInFirst: tabInFirst)
+			if newFirst == first && newSecond == second {
+				return self
+			}
+			return .split(id: id, direction: splitDir, first: newFirst, second: newSecond, fraction: fraction)
+		}
+	}
+
 	func updateSplit(panelId: UUID, fraction: CGFloat) -> PanelModel {
 		switch self {
 		case .leaf:
@@ -348,6 +372,7 @@ struct PanelView<Content: View>: View {
 	let resizeSplit: (UUID, CGFloat) -> Void
 	let onFocusPanel: (UUID) -> Void
 	let moveTab: (UUID, Int, UUID, Int) -> Void
+	let moveTabToSplit: (UUID, Int, UUID, SplitDirection, Bool) -> Void
 	let dragState: TabDragState
 
 	init(
@@ -361,6 +386,7 @@ struct PanelView<Content: View>: View {
 		resizeSplit: @escaping (UUID, CGFloat) -> Void = { _, _ in },
 		onFocusPanel: @escaping (UUID) -> Void = { _ in },
 		moveTab: @escaping (UUID, Int, UUID, Int) -> Void = { _, _, _, _ in },
+		moveTabToSplit: @escaping (UUID, Int, UUID, SplitDirection, Bool) -> Void = { _, _, _, _, _ in },
 		dragState: TabDragState = TabDragState()
 	) {
 		self.rootPanel = rootPanel
@@ -373,6 +399,7 @@ struct PanelView<Content: View>: View {
 		self.resizeSplit = resizeSplit
 		self.onFocusPanel = onFocusPanel
 		self.moveTab = moveTab
+		self.moveTabToSplit = moveTabToSplit
 		self.dragState = dragState
 	}
 
@@ -391,13 +418,55 @@ struct PanelView<Content: View>: View {
 		VStack(spacing: 0) {
 			tabBar(id: id, tabs: tabs, selectedTabIndex: selectedTabIndex)
 			if tabs.indices.contains(selectedTabIndex) {
-				leafContent(id, tabs[selectedTabIndex])
-					.frame(maxWidth: .infinity, maxHeight: .infinity)
-					.onTapGesture { onFocusPanel(id) }
-					.overlay(
-						RoundedRectangle(cornerRadius: 4)
-							.stroke(id == activePanelId ? Color.accentColor : Color.clear, lineWidth: 2)
+				ZStack {
+					leafContent(id, tabs[selectedTabIndex])
+						.frame(maxWidth: .infinity, maxHeight: .infinity)
+						.onTapGesture { onFocusPanel(id) }
+
+					RoundedRectangle(cornerRadius: 4)
+						.stroke(id == activePanelId ? Color.accentColor : Color.clear, lineWidth: 2)
+						.allowsHitTesting(false)
+
+					EdgeDropZone(
+						panelId: id,
+						direction: .horizontal,
+						tabInFirst: true,
+						dragState: dragState,
+						moveTabToSplit: moveTabToSplit
 					)
+					.frame(width: 20)
+					.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+
+					EdgeDropZone(
+						panelId: id,
+						direction: .horizontal,
+						tabInFirst: false,
+						dragState: dragState,
+						moveTabToSplit: moveTabToSplit
+					)
+					.frame(width: 20)
+					.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+
+					EdgeDropZone(
+						panelId: id,
+						direction: .vertical,
+						tabInFirst: true,
+						dragState: dragState,
+						moveTabToSplit: moveTabToSplit
+					)
+					.frame(height: 20)
+					.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+
+					EdgeDropZone(
+						panelId: id,
+						direction: .vertical,
+						tabInFirst: false,
+						dragState: dragState,
+						moveTabToSplit: moveTabToSplit
+					)
+					.frame(height: 20)
+					.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+				}
 			}
 		}
 	}
@@ -486,6 +555,7 @@ struct PanelView<Content: View>: View {
 						resizeSplit: resizeSplit,
 						onFocusPanel: onFocusPanel,
 						moveTab: moveTab,
+						moveTabToSplit: moveTabToSplit,
 						dragState: dragState
 					)
 					.frame(width: firstSize, height: geo.size.height)
@@ -507,6 +577,7 @@ struct PanelView<Content: View>: View {
 						resizeSplit: resizeSplit,
 						onFocusPanel: onFocusPanel,
 						moveTab: moveTab,
+						moveTabToSplit: moveTabToSplit,
 						dragState: dragState
 					)
 					.frame(width: max(0, secondSize), height: geo.size.height)
@@ -525,6 +596,7 @@ struct PanelView<Content: View>: View {
 						resizeSplit: resizeSplit,
 						onFocusPanel: onFocusPanel,
 						moveTab: moveTab,
+						moveTabToSplit: moveTabToSplit,
 						dragState: dragState
 					)
 					.frame(width: geo.size.width, height: firstSize)
@@ -546,6 +618,7 @@ struct PanelView<Content: View>: View {
 						resizeSplit: resizeSplit,
 						onFocusPanel: onFocusPanel,
 						moveTab: moveTab,
+						moveTabToSplit: moveTabToSplit,
 						dragState: dragState
 					)
 					.frame(width: geo.size.width, height: max(0, secondSize))
@@ -704,6 +777,57 @@ private struct InsertionIndicator: View {
 	}
 }
 
+// MARK: - Edge Drop Zone
+
+private struct EdgeDropZone: View {
+	let panelId: UUID
+	let direction: SplitDirection
+	let tabInFirst: Bool
+	let dragState: TabDragState
+	let moveTabToSplit: (UUID, Int, UUID, SplitDirection, Bool) -> Void
+
+	@State private var isTargeted = false
+
+	var body: some View {
+		Rectangle()
+			.fill(isTargeted ? Color.accentColor.opacity(0.12) : Color.clear)
+			.overlay(alignment: direction == .horizontal ? .leading : .top) {
+				if isTargeted {
+					Rectangle()
+						.fill(Color.accentColor)
+						.frame(
+							width: direction == .horizontal ? 3 : nil,
+							height: direction == .vertical ? 3 : nil
+						)
+						.padding(direction == .horizontal ? .vertical : .horizontal, 8)
+				}
+			}
+			.contentShape(Rectangle())
+			.onDrop(of: [.plainText], isTargeted: $isTargeted) { providers, _ in
+				handleDrop()
+				return true
+			}
+			.onHover { hovering in
+				if hovering {
+					(direction == .horizontal
+						? NSCursor.resizeLeftRight
+						: NSCursor.resizeUpDown
+					).push()
+				} else {
+					NSCursor.pop()
+				}
+			}
+	}
+
+	private func handleDrop() {
+		guard let sourceId = dragState.sourcePanelId,
+			  let sourceIndex = dragState.sourceTabIndex else { return }
+		moveTabToSplit(sourceId, sourceIndex, panelId, direction, tabInFirst)
+		dragState.sourcePanelId = nil
+		dragState.sourceTabIndex = nil
+	}
+}
+
 // MARK: - Panel View Model
 
 class PanelViewModel: ObservableObject {
@@ -754,5 +878,10 @@ class PanelViewModel: ObservableObject {
 
 	func moveTab(from sourcePanelId: UUID, at sourceIndex: Int, to destPanelId: UUID, at destIndex: Int) {
 		rootPanel = rootPanel.moveTab(from: sourcePanelId, at: sourceIndex, to: destPanelId, at: destIndex)
+	}
+
+	func moveTabToSplit(from sourcePanelId: UUID, at sourceIndex: Int, to destPanelId: UUID, direction: SplitDirection, tabInFirst: Bool) {
+		guard let (modelWithoutTab, tab) = rootPanel.extractingTab(from: sourcePanelId, at: sourceIndex) else { return }
+		rootPanel = modelWithoutTab.splitLeafAndAddTab(panelId: destPanelId, direction: direction, tab: tab, tabInFirst: tabInFirst)
 	}
 }

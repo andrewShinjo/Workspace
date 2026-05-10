@@ -188,6 +188,46 @@ extension PanelModel {
 	}
 }
 
+// MARK: - Panel Model Helpers
+
+extension PanelModel {
+
+	func firstLeafId() -> UUID? {
+		switch self {
+		case .leaf(let id, _, _):
+			return id
+		case .split(_, _, let first, let second, _):
+			return first.firstLeafId() ?? second.firstLeafId()
+		}
+	}
+
+	func findLeaf(panelId: UUID) -> (tabs: [TabItem], selectedTabIndex: Int)? {
+		switch self {
+		case .leaf(let id, let tabs, let selectedIndex):
+			return id == panelId ? (tabs, selectedIndex) : nil
+		case .split(_, _, let first, let second, _):
+			return first.findLeaf(panelId: panelId) ?? second.findLeaf(panelId: panelId)
+		}
+	}
+
+	func replaceTab(in panelId: UUID, at index: Int, with tab: TabItem) -> PanelModel {
+		switch self {
+		case .leaf(let id, let tabs, let selectedIndex):
+			guard id == panelId, index < tabs.count else { return self }
+			var newTabs = tabs
+			newTabs[index] = tab
+			return .leaf(id: id, tabs: newTabs, selectedTabIndex: selectedIndex)
+		case .split(let id, let direction, let first, let second, let fraction):
+			let newFirst = first.replaceTab(in: panelId, at: index, with: tab)
+			let newSecond = second.replaceTab(in: panelId, at: index, with: tab)
+			if newFirst == first && newSecond == second {
+				return self
+			}
+			return .split(id: id, direction: direction, first: newFirst, second: newSecond, fraction: fraction)
+		}
+	}
+}
+
 // MARK: - Panel View
 
 struct PanelView<Content: View>: View {
@@ -198,6 +238,7 @@ struct PanelView<Content: View>: View {
 	let closeTab: (UUID, Int) -> Void
 	let addTab: (UUID) -> Void
 	let resizeSplit: (UUID, CGFloat) -> Void
+	let onFocusPanel: (UUID) -> Void
 
 	init(
 		rootPanel: PanelModel,
@@ -206,7 +247,8 @@ struct PanelView<Content: View>: View {
 		selectTab: @escaping (UUID, Int) -> Void = { _, _ in },
 		closeTab: @escaping (UUID, Int) -> Void = { _, _ in },
 		addTab: @escaping (UUID) -> Void = { _ in },
-		resizeSplit: @escaping (UUID, CGFloat) -> Void = { _, _ in }
+		resizeSplit: @escaping (UUID, CGFloat) -> Void = { _, _ in },
+		onFocusPanel: @escaping (UUID) -> Void = { _ in }
 	) {
 		self.rootPanel = rootPanel
 		self.leafContent = leafContent
@@ -215,6 +257,7 @@ struct PanelView<Content: View>: View {
 		self.closeTab = closeTab
 		self.addTab = addTab
 		self.resizeSplit = resizeSplit
+		self.onFocusPanel = onFocusPanel
 	}
 
 	var body: some View {
@@ -234,6 +277,7 @@ struct PanelView<Content: View>: View {
 			if tabs.indices.contains(selectedTabIndex) {
 				leafContent(id, tabs[selectedTabIndex])
 					.frame(maxWidth: .infinity, maxHeight: .infinity)
+					.onTapGesture { onFocusPanel(id) }
 			}
 		}
 	}
@@ -258,14 +302,16 @@ struct PanelView<Content: View>: View {
 				.font(.caption)
 				.lineLimit(1)
 				.foregroundColor(isSelected ? .primary : .secondary)
-				.onTapGesture { selectTab(panelId, index) }
 
 			TabCloseButton { closeTab(panelId, index) }
 		}
 		.padding(.horizontal, 8)
 		.padding(.vertical, 4)
 		.background(isSelected ? Color(.windowBackgroundColor) : Color.clear)
-		.onTapGesture { selectTab(panelId, index) }
+		.onTapGesture {
+			selectTab(panelId, index)
+			onFocusPanel(panelId)
+		}
 	}
 
 	@ViewBuilder
@@ -296,7 +342,8 @@ struct PanelView<Content: View>: View {
 						selectTab: selectTab,
 						closeTab: closeTab,
 						addTab: addTab,
-						resizeSplit: resizeSplit
+						resizeSplit: resizeSplit,
+						onFocusPanel: onFocusPanel
 					)
 					.frame(width: firstSize, height: geo.size.height)
 					SplitDivider(
@@ -313,7 +360,8 @@ struct PanelView<Content: View>: View {
 						selectTab: selectTab,
 						closeTab: closeTab,
 						addTab: addTab,
-						resizeSplit: resizeSplit
+						resizeSplit: resizeSplit,
+						onFocusPanel: onFocusPanel
 					)
 					.frame(width: max(0, secondSize), height: geo.size.height)
 				}
@@ -327,7 +375,8 @@ struct PanelView<Content: View>: View {
 						selectTab: selectTab,
 						closeTab: closeTab,
 						addTab: addTab,
-						resizeSplit: resizeSplit
+						resizeSplit: resizeSplit,
+						onFocusPanel: onFocusPanel
 					)
 					.frame(width: geo.size.width, height: firstSize)
 					SplitDivider(
@@ -344,7 +393,8 @@ struct PanelView<Content: View>: View {
 						selectTab: selectTab,
 						closeTab: closeTab,
 						addTab: addTab,
-						resizeSplit: resizeSplit
+						resizeSplit: resizeSplit,
+						onFocusPanel: onFocusPanel
 					)
 					.frame(width: geo.size.width, height: max(0, secondSize))
 				}
@@ -462,6 +512,7 @@ private struct SplitDivider: View {
 
 class PanelViewModel: ObservableObject {
 	@Published var rootPanel: PanelModel = .leaf(id: UUID())
+	@Published var activePanelId: UUID?
 
 	func close(panelId: UUID) {
 		rootPanel = rootPanel.removeLeaf(panelId: panelId)
@@ -493,5 +544,9 @@ class PanelViewModel: ObservableObject {
 	func addTab(to panelId: UUID) {
 		let tab = TabItem(id: UUID(), title: "New Tab")
 		rootPanel = rootPanel.addTab(to: panelId, tab: tab)
+	}
+
+	func replaceTab(in panelId: UUID, at index: Int, with tab: TabItem) {
+		rootPanel = rootPanel.replaceTab(in: panelId, at: index, with: tab)
 	}
 }

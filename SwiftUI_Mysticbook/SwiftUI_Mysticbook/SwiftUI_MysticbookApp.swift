@@ -29,6 +29,11 @@ struct SwiftUI_MysticbookApp: App {
 			}
 			.commands {
 				CommandGroup(before: .help) {
+					Button("Open File…") {
+						showCommandPalette.toggle()
+					}
+					.keyboardShortcut("o", modifiers: .command)
+
 					Button("Open Command Palette") {
 						showCommandPalette.toggle()
 					}

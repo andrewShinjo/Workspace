@@ -31,6 +31,7 @@ struct ContentView: View {
 	@State private var tabDocuments: [UUID: OutlinerDocument] = [:]
 	@State private var tabDocumentURLs: [UUID: URL] = [:]
 	@State private var documentRegistry: [URL: OutlinerDocument] = [:]
+	@State private var tabDragState = TabDragState()
 
 	var body: some View {
 			ZStack {
@@ -65,7 +66,8 @@ struct ContentView: View {
 				addTab: { panelVM.addTab(to: $0) },
 				resizeSplit: { panelVM.resize(splitId: $0, newFraction: $1) },
 				onFocusPanel: { panelVM.activePanelId = $0 },
-				moveTab: { panelVM.moveTab(from: $0, at: $1, to: $2, at: $3) }
+				moveTab: { panelVM.moveTab(from: $0, at: $1, to: $2, at: $3) },
+				dragState: tabDragState
 			)
 
 			if showCommandPalette {

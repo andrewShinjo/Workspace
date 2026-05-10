@@ -83,6 +83,19 @@ struct ContentView: View {
 			.keyboardShortcut("t", modifiers: .command)
 			.opacity(0)
 			.frame(width: 0, height: 0)
+
+			Button("") {
+				guard let panelId = panelVM.activePanelId ?? panelVM.rootPanel.firstLeafId(),
+					  let leaf = panelVM.rootPanel.findLeaf(panelId: panelId) else { return }
+				let index = leaf.selectedTabIndex
+				let oldId = leaf.tabs[index].id
+				tabDocuments.removeValue(forKey: oldId)
+				tabDocumentURLs.removeValue(forKey: oldId)
+				panelVM.closeTab(panelId: panelId, at: index)
+			}
+			.keyboardShortcut("w", modifiers: .command)
+			.opacity(0)
+			.frame(width: 0, height: 0)
 		}
 	}
 

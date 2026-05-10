@@ -364,6 +364,7 @@ private struct SplitDivider: View {
 	let onResize: (UUID, CGFloat) -> Void
 
 	@State private var dragStartFraction: CGFloat? = nil
+	@State private var isHoveringDivider = false
 
 	var body: some View {
 		Color.clear
@@ -373,16 +374,34 @@ private struct SplitDivider: View {
 			)
 			.overlay(
 				Rectangle()
-					.fill(Color(nsColor: .separatorColor))
+					.fill(Color(nsColor: isHoveringDivider ? .controlAccentColor : .separatorColor))
 					.frame(
 						width: direction == .horizontal ? 3 : nil,
 						height: direction == .vertical ? 3 : nil
 					)
 			)
 			.contentShape(Rectangle())
+			.onHover { hovering in
+				isHoveringDivider = hovering
+				if hovering {
+					(direction == .horizontal
+						? NSCursor.resizeLeftRight
+						: NSCursor.resizeUpDown
+					).push()
+				} else {
+					NSCursor.pop()
+				}
+			}
 			.gesture(
 				DragGesture()
 					.onChanged { value in
+						if !isHoveringDivider {
+							isHoveringDivider = true
+							(direction == .horizontal
+								? NSCursor.resizeLeftRight
+								: NSCursor.resizeUpDown
+							).push()
+						}
 						let sf = dragStartFraction ?? fraction
 						dragStartFraction = sf
 						let delta = direction == .horizontal ? value.translation.width : value.translation.height
@@ -391,6 +410,8 @@ private struct SplitDivider: View {
 					}
 					.onEnded { _ in
 						dragStartFraction = nil
+						isHoveringDivider = false
+						NSCursor.pop()
 					}
 			)
 	}

@@ -36,6 +36,7 @@ struct ContentView: View {
 		ZStack {
 			PanelView(
 				rootPanel: panelVM.rootPanel,
+				activePanelId: panelVM.activePanelId,
 				leafContent: { id, tabItem in
 					if let document = tabDocuments[tabItem.id] {
 						Outliner(document: document, saveURL: tabDocumentURLs[tabItem.id])

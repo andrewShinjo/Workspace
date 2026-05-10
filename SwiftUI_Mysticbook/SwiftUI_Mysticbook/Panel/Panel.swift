@@ -153,10 +153,18 @@ extension PanelModel {
 				}
 				return .leaf(id: id, tabs: newTabs, selectedTabIndex: newSelected)
 			}
-			return .leaf(id: UUID())
+			return .leaf(id: id, tabs: [], selectedTabIndex: 0)
 		case .split(let id, let direction, let first, let second, let fraction):
 			let newFirst = first.closeTab(in: panelId, at: index)
 			let newSecond = second.closeTab(in: panelId, at: index)
+
+			if case .leaf(_, let ftabs, _) = newFirst, ftabs.isEmpty {
+				return newSecond
+			}
+			if case .leaf(_, let stabs, _) = newSecond, stabs.isEmpty {
+				return newFirst
+			}
+
 			if newFirst == first && newSecond == second {
 				return self
 			}
@@ -441,7 +449,12 @@ class PanelViewModel: ObservableObject {
 	}
 
 	func closeTab(panelId: UUID, at index: Int) {
-		rootPanel = rootPanel.closeTab(in: panelId, at: index)
+		let newPanel = rootPanel.closeTab(in: panelId, at: index)
+		if case .leaf(_, let tabs, _) = newPanel, tabs.isEmpty {
+			rootPanel = .leaf(id: UUID())
+		} else {
+			rootPanel = newPanel
+		}
 	}
 
 	func addTab(to panelId: UUID) {

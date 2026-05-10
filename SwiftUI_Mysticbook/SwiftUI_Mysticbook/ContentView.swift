@@ -30,6 +30,7 @@ struct ContentView: View {
 
 	@State private var tabDocuments: [UUID: OutlinerDocument] = [:]
 	@State private var tabDocumentURLs: [UUID: URL] = [:]
+	@State private var documentRegistry: [URL: OutlinerDocument] = [:]
 
 	var body: some View {
 		ZStack {
@@ -77,7 +78,14 @@ struct ContentView: View {
 	}
 
 	private func openFileInActivePanel(_ url: URL) {
-		guard let document = try? orgDeserialize(String(contentsOf: url)) else { return }
+		let document: OutlinerDocument
+		if let existing = documentRegistry[url] {
+			document = existing
+		} else {
+			guard let newDoc = try? orgDeserialize(String(contentsOf: url)) else { return }
+			documentRegistry[url] = newDoc
+			document = newDoc
+		}
 
 		let panelId = panelVM.activePanelId ?? panelVM.rootPanel.firstLeafId()
 		guard let panelId else { return }

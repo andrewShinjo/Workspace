@@ -555,6 +555,9 @@ class PanelViewModel: ObservableObject {
 	func addTab(to panelId: UUID) {
 		let tab = TabItem(id: UUID(), title: "New Tab")
 		rootPanel = rootPanel.addTab(to: panelId, tab: tab)
+		if let leaf = rootPanel.findLeaf(panelId: panelId) {
+			rootPanel = rootPanel.selectTab(in: panelId, at: leaf.tabs.count - 1)
+		}
 	}
 
 	func replaceTab(in panelId: UUID, at index: Int, with tab: TabItem) {

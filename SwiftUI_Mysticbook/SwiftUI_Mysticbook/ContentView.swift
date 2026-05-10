@@ -33,7 +33,7 @@ struct ContentView: View {
 	@State private var documentRegistry: [URL: OutlinerDocument] = [:]
 
 	var body: some View {
-		ZStack {
+			ZStack {
 			PanelView(
 				rootPanel: panelVM.rootPanel,
 				activePanelId: panelVM.activePanelId,
@@ -75,6 +75,14 @@ struct ContentView: View {
 					onSelectFile: openFileInActivePanel
 				)
 			}
+
+			Button("") {
+				let panelId = panelVM.activePanelId ?? panelVM.rootPanel.firstLeafId()
+				if let panelId { panelVM.addTab(to: panelId) }
+			}
+			.keyboardShortcut("t", modifiers: .command)
+			.opacity(0)
+			.frame(width: 0, height: 0)
 		}
 	}
 

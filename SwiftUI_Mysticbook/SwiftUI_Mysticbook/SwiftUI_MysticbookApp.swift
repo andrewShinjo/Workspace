@@ -21,11 +21,7 @@ struct SwiftUI_MysticbookApp: App {
 					showFlashcardPane: $showFlashcardPane,
 					workspace: workspace
 				)
-					.onAppear {
-						DispatchQueue.main.async {
-							workspace.restoreSavedDirectory()
-						}
-					}
+
 			}
 			.commands {
 				CommandGroup(before: .help) {

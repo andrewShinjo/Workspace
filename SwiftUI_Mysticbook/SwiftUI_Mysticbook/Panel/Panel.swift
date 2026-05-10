@@ -19,21 +19,21 @@ class TabDragState {
 
 // MARK: - Split Direction
 
-enum SplitDirection {
+enum SplitDirection: String, Codable {
 	case horizontal
 	case vertical
 }
 
 // MARK: - Tab Item
 
-struct TabItem: Identifiable, Equatable {
+struct TabItem: Identifiable, Equatable, Codable {
 	let id: UUID
 	var title: String
 }
 
 // MARK: - Panel Model
 
-indirect enum PanelModel: Equatable {
+indirect enum PanelModel: Equatable, Codable {
 	case leaf(id: UUID, tabs: [TabItem], selectedTabIndex: Int)
 	case split(
 		id: UUID,
@@ -49,6 +49,45 @@ indirect enum PanelModel: Equatable {
 			return id
 		case .split(let id, _, _, _, _):
 			return id
+		}
+	}
+
+	enum CodingKeys: String, CodingKey {
+		case leaf
+		case split
+	}
+
+	struct LeafRep: Codable {
+		var id: UUID
+		var tabs: [TabItem]
+		var selectedTabIndex: Int
+	}
+
+	struct SplitRep: Codable {
+		var id: UUID
+		var direction: SplitDirection
+		var first: PanelModel
+		var second: PanelModel
+		var fraction: CGFloat
+	}
+
+	func encode(to encoder: Encoder) throws {
+		var container = encoder.container(keyedBy: CodingKeys.self)
+		switch self {
+		case .leaf(let id, let tabs, let selectedTabIndex):
+			try container.encode(LeafRep(id: id, tabs: tabs, selectedTabIndex: selectedTabIndex), forKey: .leaf)
+		case .split(let id, let direction, let first, let second, let fraction):
+			try container.encode(SplitRep(id: id, direction: direction, first: first, second: second, fraction: fraction), forKey: .split)
+		}
+	}
+
+	init(from decoder: Decoder) throws {
+		let container = try decoder.container(keyedBy: CodingKeys.self)
+		if let leaf = try container.decodeIfPresent(LeafRep.self, forKey: .leaf) {
+			self = .leaf(id: leaf.id, tabs: leaf.tabs, selectedTabIndex: leaf.selectedTabIndex)
+		} else {
+			let split = try container.decode(SplitRep.self, forKey: .split)
+			self = .split(id: split.id, direction: split.direction, first: split.first, second: split.second, fraction: split.fraction)
 		}
 	}
 }
@@ -883,5 +922,30 @@ class PanelViewModel: ObservableObject {
 	func moveTabToSplit(from sourcePanelId: UUID, at sourceIndex: Int, to destPanelId: UUID, direction: SplitDirection, tabInFirst: Bool) {
 		guard let (modelWithoutTab, tab) = rootPanel.extractingTab(from: sourcePanelId, at: sourceIndex) else { return }
 		rootPanel = modelWithoutTab.splitLeafAndAddTab(panelId: destPanelId, direction: direction, tab: tab, tabInFirst: tabInFirst)
+	}
+}
+
+// MARK: - Workspace State (persisted to dot file)
+
+struct WorkspaceState: Codable {
+	var rootPanel: PanelModel
+	var tabFiles: [UUID: String]
+}
+
+// MARK: - Panel View Model State Persistence
+
+extension PanelViewModel {
+	func saveState(to url: URL, tabFiles: [UUID: String]) throws {
+		let state = WorkspaceState(rootPanel: rootPanel, tabFiles: tabFiles)
+		let data = try JSONEncoder().encode(state)
+		try data.write(to: url)
+	}
+
+	@discardableResult
+	func restoreState(from url: URL) throws -> [UUID: String] {
+		let data = try Data(contentsOf: url)
+		let state = try JSONDecoder().decode(WorkspaceState.self, from: data)
+		rootPanel = state.rootPanel
+		return state.tabFiles
 	}
 }

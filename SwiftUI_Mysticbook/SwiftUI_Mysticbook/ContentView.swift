@@ -6,27 +6,7 @@ struct ContentView: View {
 	@Binding var showFlashcardPane: Bool
 	@StateObject var workspace: Workspace
 
-	private static let tealLeaf = UUID()
-	private static let indigoLeaf = UUID()
-	private static let orangeLeaf = UUID()
-
-	@StateObject private var panelVM: PanelViewModel = {
-		let vm = PanelViewModel()
-		vm.rootPanel = .split(
-			id: UUID(),
-			direction: .horizontal,
-			first: .leaf(id: ContentView.tealLeaf, tabs: [TabItem(id: UUID(), title: "Panel 1")], selectedTabIndex: 0),
-			second: .split(
-				id: UUID(),
-				direction: .vertical,
-				first: .leaf(id: ContentView.indigoLeaf, tabs: [TabItem(id: UUID(), title: "Panel 2")], selectedTabIndex: 0),
-				second: .leaf(id: ContentView.orangeLeaf, tabs: [TabItem(id: UUID(), title: "Panel 3")], selectedTabIndex: 0),
-				fraction: 0.5
-			),
-			fraction: 0.4
-		)
-		return vm
-	}()
+	@StateObject private var panelVM = PanelViewModel()
 
 	@State private var tabDocuments: [UUID: OutlinerDocument] = [:]
 	@State private var tabDocumentURLs: [UUID: URL] = [:]
@@ -43,14 +23,9 @@ struct ContentView: View {
 						Outliner(document: document, saveURL: tabDocumentURLs[tabItem.id])
 							.id(tabItem.id)
 					} else {
-						ZStack {
-							(id == Self.tealLeaf ? Color.teal.opacity(0.2) :
-								id == Self.indigoLeaf ? Color.indigo.opacity(0.2) :
-								Color.orange.opacity(0.2))
-							Text(tabItem.title)
-								.font(.caption)
-								.foregroundStyle(.secondary)
-						}
+						Text(tabItem.title)
+							.font(.caption)
+							.foregroundStyle(.secondary)
 					}
 				},
 				selectTab: { panelVM.selectTab(panelId: $0, at: $1) },
@@ -108,6 +83,19 @@ struct ContentView: View {
 			.opacity(0)
 			.frame(width: 0, height: 0)
 		}
+		.onAppear {
+			workspace.restoreSavedDirectory()
+			restorePanelState()
+		}
+		.onChange(of: panelVM.rootPanel) { _ in
+			savePanelState()
+		}
+		.onChange(of: tabDocumentURLs) { _ in
+			savePanelState()
+		}
+		.onChange(of: workspace.directoryURL) { _ in
+			restorePanelState()
+		}
 	}
 
 	private func createNewUntitledTab() {
@@ -162,6 +150,55 @@ struct ContentView: View {
 		tabDocumentURLs[newTabId] = url
 
 		panelVM.replaceTab(in: panelId, at: tabIndex, with: tab)
+	}
+
+	private func restorePanelState() {
+		guard let dir = workspace.directoryURL else { return }
+		let stateURL = dir.appendingPathComponent(".mysticbook_state")
+		guard FileManager.default.fileExists(atPath: stateURL.path) else { return }
+
+		guard let tabFiles = try? panelVM.restoreState(from: stateURL) else { return }
+
+		for (tabId, relativePath) in tabFiles {
+			let url = dir.appendingPathComponent(relativePath)
+			guard FileManager.default.fileExists(atPath: url.path) else { continue }
+			guard let document = try? orgDeserialize(String(contentsOf: url)) else { continue }
+			tabDocuments[tabId] = document
+			tabDocumentURLs[tabId] = url
+			documentRegistry[url] = document
+		}
+
+		populateUntitledTabDocuments()
+	}
+
+	private func populateUntitledTabDocuments() {
+		func populate(_ panel: PanelModel) {
+			switch panel {
+			case .leaf(_, let tabs, _):
+				for tab in tabs where tabDocuments[tab.id] == nil {
+					tabDocuments[tab.id] = OutlinerDocument(rootNode: OutlinerNode(text: ""))
+				}
+			case .split(_, _, let first, let second, _):
+				populate(first)
+				populate(second)
+			}
+		}
+		populate(panelVM.rootPanel)
+	}
+
+	private func savePanelState() {
+		guard let dir = workspace.directoryURL else { return }
+		let stateURL = dir.appendingPathComponent(".mysticbook_state")
+
+		let basePath = dir.path.hasSuffix("/") ? dir.path : dir.path + "/"
+		var tabFiles: [UUID: String] = [:]
+		for (tabId, url) in tabDocumentURLs {
+			let filePath = url.path
+			guard filePath.hasPrefix(basePath) else { continue }
+			tabFiles[tabId] = String(filePath.dropFirst(basePath.count))
+		}
+
+		try? panelVM.saveState(to: stateURL, tabFiles: tabFiles)
 	}
 }
 

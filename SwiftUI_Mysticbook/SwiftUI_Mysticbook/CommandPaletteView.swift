@@ -30,6 +30,41 @@ struct CommandPaletteView: View {
 	@State private var searchText = ""
 	@State private var selectedURL: URL?
 	@FocusState private var isFocused: Bool
+	@State private var eventMonitor: Any?
+
+	private func moveSelection(up: Bool) {
+		guard !filteredFiles.isEmpty else { return }
+		if let current = selectedURL, let currentIndex = filteredFiles.firstIndex(where: { $0.url == current }) {
+			if up {
+				selectedURL = filteredFiles[(currentIndex - 1 + filteredFiles.count) % filteredFiles.count].url
+			} else {
+				selectedURL = filteredFiles[(currentIndex + 1) % filteredFiles.count].url
+			}
+		} else {
+			selectedURL = up ? filteredFiles.last?.url : filteredFiles.first?.url
+		}
+	}
+
+	private func installEventMonitor() {
+		eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+			if event.keyCode == 126 {
+				self.moveSelection(up: true)
+				return nil
+			}
+			if event.keyCode == 125 {
+				self.moveSelection(up: false)
+				return nil
+			}
+			return event
+		}
+	}
+
+	private func removeEventMonitor() {
+		if let monitor = eventMonitor {
+			NSEvent.removeMonitor(monitor)
+			eventMonitor = nil
+		}
+	}
 
 	private var flatFiles: [FlatFile] {
 		flattenFileTree(files)
@@ -134,6 +169,8 @@ struct CommandPaletteView: View {
 		.frame(maxWidth: .infinity, maxHeight: .infinity)
 		.background(Color.black.opacity(0.2))
 		.onTapGesture { isPresented = false }
+		.onAppear { installEventMonitor() }
+		.onDisappear { removeEventMonitor() }
 	}
 
 	private func selectFile(_ url: URL?) {

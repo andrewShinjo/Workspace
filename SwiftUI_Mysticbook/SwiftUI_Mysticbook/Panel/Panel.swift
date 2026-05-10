@@ -232,6 +232,7 @@ extension PanelModel {
 
 struct PanelView<Content: View>: View {
 	let rootPanel: PanelModel
+	let activePanelId: UUID?
 	@ViewBuilder let leafContent: (UUID, TabItem) -> Content
 	let closePanel: (UUID) -> Void
 	let selectTab: (UUID, Int) -> Void
@@ -242,6 +243,7 @@ struct PanelView<Content: View>: View {
 
 	init(
 		rootPanel: PanelModel,
+		activePanelId: UUID? = nil,
 		@ViewBuilder leafContent: @escaping (UUID, TabItem) -> Content,
 		closePanel: @escaping (UUID) -> Void = { _ in },
 		selectTab: @escaping (UUID, Int) -> Void = { _, _ in },
@@ -251,6 +253,7 @@ struct PanelView<Content: View>: View {
 		onFocusPanel: @escaping (UUID) -> Void = { _ in }
 	) {
 		self.rootPanel = rootPanel
+		self.activePanelId = activePanelId
 		self.leafContent = leafContent
 		self.closePanel = closePanel
 		self.selectTab = selectTab
@@ -278,6 +281,10 @@ struct PanelView<Content: View>: View {
 				leafContent(id, tabs[selectedTabIndex])
 					.frame(maxWidth: .infinity, maxHeight: .infinity)
 					.onTapGesture { onFocusPanel(id) }
+					.overlay(
+						RoundedRectangle(cornerRadius: 4)
+							.stroke(id == activePanelId ? Color.accentColor : Color.clear, lineWidth: 2)
+					)
 			}
 		}
 	}
@@ -337,6 +344,7 @@ struct PanelView<Content: View>: View {
 				HStack(spacing: 0) {
 					PanelView(
 						rootPanel: first,
+						activePanelId: activePanelId,
 						leafContent: leafContent,
 						closePanel: closePanel,
 						selectTab: selectTab,
@@ -355,6 +363,7 @@ struct PanelView<Content: View>: View {
 					)
 					PanelView(
 						rootPanel: second,
+						activePanelId: activePanelId,
 						leafContent: leafContent,
 						closePanel: closePanel,
 						selectTab: selectTab,
@@ -370,6 +379,7 @@ struct PanelView<Content: View>: View {
 				VStack(spacing: 0) {
 					PanelView(
 						rootPanel: first,
+						activePanelId: activePanelId,
 						leafContent: leafContent,
 						closePanel: closePanel,
 						selectTab: selectTab,
@@ -388,6 +398,7 @@ struct PanelView<Content: View>: View {
 					)
 					PanelView(
 						rootPanel: second,
+						activePanelId: activePanelId,
 						leafContent: leafContent,
 						closePanel: closePanel,
 						selectTab: selectTab,
@@ -544,6 +555,9 @@ class PanelViewModel: ObservableObject {
 	func addTab(to panelId: UUID) {
 		let tab = TabItem(id: UUID(), title: "New Tab")
 		rootPanel = rootPanel.addTab(to: panelId, tab: tab)
+		if let leaf = rootPanel.findLeaf(panelId: panelId) {
+			rootPanel = rootPanel.selectTab(in: panelId, at: leaf.tabs.count - 1)
+		}
 	}
 
 	func replaceTab(in panelId: UUID, at index: Int, with tab: TabItem) {

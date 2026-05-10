@@ -37,6 +37,18 @@ struct Outliner: NSViewRepresentable {
 		let scrollView = NSScrollView()
 		scrollView.documentView = outlineView
 		scrollView.hasVerticalScroller = true
+		scrollView.hasHorizontalScroller = false
+		scrollView.horizontalScrollElasticity = .none
+
+		outlineView.sizeLastColumnToFit()
+		outlineView.columnAutoresizingStyle = .uniformColumnAutoresizingStyle
+
+		outlineView.translatesAutoresizingMaskIntoConstraints = false
+		NSLayoutConstraint.activate([
+			outlineView.leadingAnchor.constraint(equalTo: scrollView.contentView.leadingAnchor),
+			outlineView.trailingAnchor.constraint(equalTo: scrollView.contentView.trailingAnchor),
+			outlineView.topAnchor.constraint(equalTo: scrollView.contentView.topAnchor),
+		])
 
 		return scrollView
 	}

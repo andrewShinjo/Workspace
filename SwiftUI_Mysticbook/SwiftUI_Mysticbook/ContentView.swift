@@ -33,9 +33,10 @@ struct ContentView: View {
 	@State private var documentRegistry: [URL: OutlinerDocument] = [:]
 
 	var body: some View {
-		ZStack {
+			ZStack {
 			PanelView(
 				rootPanel: panelVM.rootPanel,
+				activePanelId: panelVM.activePanelId,
 				leafContent: { id, tabItem in
 					if let document = tabDocuments[tabItem.id] {
 						Outliner(document: document, saveURL: tabDocumentURLs[tabItem.id])
@@ -74,6 +75,27 @@ struct ContentView: View {
 					onSelectFile: openFileInActivePanel
 				)
 			}
+
+			Button("") {
+				let panelId = panelVM.activePanelId ?? panelVM.rootPanel.firstLeafId()
+				if let panelId { panelVM.addTab(to: panelId) }
+			}
+			.keyboardShortcut("t", modifiers: .command)
+			.opacity(0)
+			.frame(width: 0, height: 0)
+
+			Button("") {
+				guard let panelId = panelVM.activePanelId ?? panelVM.rootPanel.firstLeafId(),
+					  let leaf = panelVM.rootPanel.findLeaf(panelId: panelId) else { return }
+				let index = leaf.selectedTabIndex
+				let oldId = leaf.tabs[index].id
+				tabDocuments.removeValue(forKey: oldId)
+				tabDocumentURLs.removeValue(forKey: oldId)
+				panelVM.closeTab(panelId: panelId, at: index)
+			}
+			.keyboardShortcut("w", modifiers: .command)
+			.opacity(0)
+			.frame(width: 0, height: 0)
 		}
 	}
 

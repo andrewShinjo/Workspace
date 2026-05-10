@@ -48,8 +48,6 @@ struct CommandPaletteView: View {
 			emptyBody(message: "No Workspace Open", detail: "Select a folder in the sidebar first")
 		} else if flatFiles.isEmpty {
 			emptyBody(message: "No Files Found", detail: "Add .org files to your workspace")
-		} else if filteredFiles.isEmpty {
-			emptyBody(message: "No Matches", detail: "Try a different search term")
 		} else {
 			paletteBody
 		}
@@ -88,36 +86,48 @@ struct CommandPaletteView: View {
 
 			Divider()
 
-			List(filteredFiles, id: \.url, selection: $selectedURL) { file in
-				HStack(spacing: 6) {
-					Image(systemName: "doc.text")
+			if filteredFiles.isEmpty {
+				VStack(spacing: 8) {
+					Text("No Matches")
+						.font(.headline)
+					Text("Try a different search term")
 						.font(.caption)
-						.foregroundStyle(.tertiary)
-					Text(file.name)
-						.fontWeight(.medium)
-					if let dir = file.parentDir {
-						Text(dir)
+						.foregroundStyle(.secondary)
+				}
+				.padding(40)
+				.frame(maxWidth: .infinity, maxHeight: .infinity)
+			} else {
+				List(filteredFiles, id: \.url, selection: $selectedURL) { file in
+					HStack(spacing: 6) {
+						Image(systemName: "doc.text")
 							.font(.caption)
 							.foregroundStyle(.tertiary)
+						Text(file.name)
+							.fontWeight(.medium)
+						if let dir = file.parentDir {
+							Text(dir)
+								.font(.caption)
+								.foregroundStyle(.tertiary)
+						}
+						Spacer(minLength: 0)
 					}
-					Spacer(minLength: 0)
+					.padding(.vertical, 2)
+					.tag(file.url)
+					.onTapGesture {
+						selectedURL = file.url
+						selectFile(file.url)
+					}
 				}
-				.padding(.vertical, 2)
-				.tag(file.url)
-				.onTapGesture {
-					selectedURL = file.url
-					selectFile(file.url)
+				.listStyle(.plain)
+				.onAppear {
+					selectedURL = filteredFiles.first?.url
+				}
+				.onChange(of: searchText) { _, _ in
+					selectedURL = filteredFiles.first?.url
 				}
 			}
-			.listStyle(.plain)
-			.onAppear {
-				selectedURL = filteredFiles.first?.url
-			}
-			.onChange(of: searchText) { _, _ in
-				selectedURL = filteredFiles.first?.url
-			}
-			.onExitCommand { isPresented = false }
 		}
+		.onExitCommand { isPresented = false }
 		.background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
 		.shadow(radius: 20)
 		.frame(width: 440, height: 360)

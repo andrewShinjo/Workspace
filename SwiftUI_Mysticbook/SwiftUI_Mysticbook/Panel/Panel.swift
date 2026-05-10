@@ -16,6 +16,13 @@ enum SplitDirection {
 	case vertical
 }
 
+// MARK: - Tab Item
+
+struct TabItem: Identifiable, Equatable {
+	let id: UUID
+	var title: String
+}
+
 // MARK: - Panel Model
 
 indirect enum PanelModel: Equatable {

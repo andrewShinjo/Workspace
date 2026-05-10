@@ -1,5 +1,31 @@
 import SwiftUI
 
+private struct SidebarButtonBar: View {
+	var body: some View {
+		VStack(spacing: 0) {
+			Button(action: {}) {
+				Image(systemName: "rectangle.on.rectangle")
+					.font(.system(size: 13, weight: .medium))
+			}
+			.buttonStyle(.plain)
+			.foregroundColor(.secondary)
+			.padding(.top, 10)
+
+			Spacer()
+		}
+		.frame(width: 24)
+		.frame(maxHeight: .infinity)
+		.background {
+			Color(nsColor: .windowBackgroundColor)
+		}
+		.overlay(alignment: .trailing) {
+			Rectangle()
+				.fill(Color(nsColor: .separatorColor))
+				.frame(width: 1)
+		}
+	}
+}
+
 struct ContentView: View {
 
 	@Binding var showCommandPalette: Bool
@@ -14,74 +40,78 @@ struct ContentView: View {
 	@State private var tabDragState = TabDragState()
 
 	var body: some View {
+		HStack(spacing: 0) {
+			SidebarButtonBar()
+
 			ZStack {
-			PanelView(
-				rootPanel: panelVM.rootPanel,
-				activePanelId: panelVM.activePanelId,
-				leafContent: { id, tabItem in
-					if let document = tabDocuments[tabItem.id] {
-						Outliner(document: document, saveURL: tabDocumentURLs[tabItem.id])
-							.id(tabItem.id)
-					} else {
-						Text(tabItem.title)
-							.font(.caption)
-							.foregroundStyle(.secondary)
-					}
-				},
-				selectTab: { panelVM.selectTab(panelId: $0, at: $1) },
-				closeTab: { panelId, index in
-					if let leaf = panelVM.rootPanel.findLeaf(panelId: panelId),
-					   index < leaf.tabs.count {
-						let oldId = leaf.tabs[index].id
-						tabDocuments.removeValue(forKey: oldId)
-						tabDocumentURLs.removeValue(forKey: oldId)
-					}
-					panelVM.closeTab(panelId: panelId, at: index)
-				},
-				addTab: { panelVM.addTab(to: $0) },
-				resizeSplit: { panelVM.resize(splitId: $0, newFraction: $1) },
-				onFocusPanel: { panelVM.activePanelId = $0 },
-				moveTab: { panelVM.moveTab(from: $0, at: $1, to: $2, at: $3) },
-				moveTabToSplit: { panelVM.moveTabToSplit(from: $0, at: $1, to: $2, direction: $3, tabInFirst: $4) },
-				dragState: tabDragState
-			)
-
-			if showCommandPalette {
-				CommandPaletteView(
-					isPresented: $showCommandPalette,
-					files: workspace.fileItems,
-					workspaceDirectoryURL: workspace.directoryURL,
-					onSelectFile: openFileInActivePanel
+				PanelView(
+					rootPanel: panelVM.rootPanel,
+					activePanelId: panelVM.activePanelId,
+					leafContent: { id, tabItem in
+						if let document = tabDocuments[tabItem.id] {
+							Outliner(document: document, saveURL: tabDocumentURLs[tabItem.id])
+								.id(tabItem.id)
+						} else {
+							Text(tabItem.title)
+								.font(.caption)
+								.foregroundStyle(.secondary)
+						}
+					},
+					selectTab: { panelVM.selectTab(panelId: $0, at: $1) },
+					closeTab: { panelId, index in
+						if let leaf = panelVM.rootPanel.findLeaf(panelId: panelId),
+						   index < leaf.tabs.count {
+							let oldId = leaf.tabs[index].id
+							tabDocuments.removeValue(forKey: oldId)
+							tabDocumentURLs.removeValue(forKey: oldId)
+						}
+						panelVM.closeTab(panelId: panelId, at: index)
+					},
+					addTab: { panelVM.addTab(to: $0) },
+					resizeSplit: { panelVM.resize(splitId: $0, newFraction: $1) },
+					onFocusPanel: { panelVM.activePanelId = $0 },
+					moveTab: { panelVM.moveTab(from: $0, at: $1, to: $2, at: $3) },
+					moveTabToSplit: { panelVM.moveTabToSplit(from: $0, at: $1, to: $2, direction: $3, tabInFirst: $4) },
+					dragState: tabDragState
 				)
-			}
 
-			Button("") {
-				createNewUntitledTab()
-			}
-			.keyboardShortcut("n", modifiers: .command)
-			.opacity(0)
-			.frame(width: 0, height: 0)
+				if showCommandPalette {
+					CommandPaletteView(
+						isPresented: $showCommandPalette,
+						files: workspace.fileItems,
+						workspaceDirectoryURL: workspace.directoryURL,
+						onSelectFile: openFileInActivePanel
+					)
+				}
 
-			Button("") {
-				let panelId = panelVM.activePanelId ?? panelVM.rootPanel.firstLeafId()
-				if let panelId { panelVM.addTab(to: panelId) }
-			}
-			.keyboardShortcut("t", modifiers: .command)
-			.opacity(0)
-			.frame(width: 0, height: 0)
+				Button("") {
+					createNewUntitledTab()
+				}
+				.keyboardShortcut("n", modifiers: .command)
+				.opacity(0)
+				.frame(width: 0, height: 0)
 
-			Button("") {
-				guard let panelId = panelVM.activePanelId ?? panelVM.rootPanel.firstLeafId(),
-					  let leaf = panelVM.rootPanel.findLeaf(panelId: panelId) else { return }
-				let index = leaf.selectedTabIndex
-				let oldId = leaf.tabs[index].id
-				tabDocuments.removeValue(forKey: oldId)
-				tabDocumentURLs.removeValue(forKey: oldId)
-				panelVM.closeTab(panelId: panelId, at: index)
+				Button("") {
+					let panelId = panelVM.activePanelId ?? panelVM.rootPanel.firstLeafId()
+					if let panelId { panelVM.addTab(to: panelId) }
+				}
+				.keyboardShortcut("t", modifiers: .command)
+				.opacity(0)
+				.frame(width: 0, height: 0)
+
+				Button("") {
+					guard let panelId = panelVM.activePanelId ?? panelVM.rootPanel.firstLeafId(),
+						  let leaf = panelVM.rootPanel.findLeaf(panelId: panelId) else { return }
+					let index = leaf.selectedTabIndex
+					let oldId = leaf.tabs[index].id
+					tabDocuments.removeValue(forKey: oldId)
+					tabDocumentURLs.removeValue(forKey: oldId)
+					panelVM.closeTab(panelId: panelId, at: index)
+				}
+				.keyboardShortcut("w", modifiers: .command)
+				.opacity(0)
+				.frame(width: 0, height: 0)
 			}
-			.keyboardShortcut("w", modifiers: .command)
-			.opacity(0)
-			.frame(width: 0, height: 0)
 		}
 		.onAppear {
 			workspace.restoreSavedDirectory()

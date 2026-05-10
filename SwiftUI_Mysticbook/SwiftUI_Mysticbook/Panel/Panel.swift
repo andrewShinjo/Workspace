@@ -260,12 +260,7 @@ struct PanelView<Content: View>: View {
 				.foregroundColor(isSelected ? .primary : .secondary)
 				.onTapGesture { selectTab(panelId, index) }
 
-			if isSelected {
-				Text("[X]")
-					.font(.caption2)
-					.foregroundColor(.secondary)
-					.onTapGesture { closeTab(panelId, index) }
-			}
+			TabCloseButton { closeTab(panelId, index) }
 		}
 		.padding(.horizontal, 8)
 		.padding(.vertical, 4)
@@ -275,11 +270,7 @@ struct PanelView<Content: View>: View {
 
 	@ViewBuilder
 	func addTabButton(panelId: UUID) -> some View {
-		Text("[+]")
-			.font(.caption)
-			.foregroundColor(.secondary)
-			.padding(.horizontal, 6)
-			.onTapGesture { addTab(panelId) }
+		TabAddButton { addTab(panelId) }
 	}
 
 	@ViewBuilder
@@ -359,6 +350,48 @@ struct PanelView<Content: View>: View {
 				}
 			}
 		}
+	}
+}
+
+// MARK: - Tab Close Button
+
+private struct TabCloseButton: View {
+	let action: () -> Void
+
+	@State private var isHovering = false
+
+	var body: some View {
+		Image(systemName: "xmark")
+			.font(.system(size: 9, weight: .bold))
+			.foregroundColor(.secondary)
+			.padding(6)
+			.background(
+				RoundedRectangle(cornerRadius: 4)
+					.fill(isHovering ? Color.gray.opacity(0.15) : Color.clear)
+			)
+			.onTapGesture { action() }
+			.onHover { isHovering = $0 }
+	}
+}
+
+// MARK: - Tab Add Button
+
+private struct TabAddButton: View {
+	let action: () -> Void
+
+	@State private var isHovering = false
+
+	var body: some View {
+		Image(systemName: "plus")
+			.font(.system(size: 11, weight: .medium))
+			.foregroundColor(.secondary)
+			.padding(6)
+			.background(
+				RoundedRectangle(cornerRadius: 4)
+					.fill(isHovering ? Color.gray.opacity(0.15) : Color.clear)
+			)
+			.onTapGesture { action() }
+			.onHover { isHovering = $0 }
 	}
 }
 

@@ -64,7 +64,6 @@ struct Outliner: NSViewRepresentable {
 			context.coordinator.lastDocument = document
 			context.coordinator.resubscribe()
 			DispatchQueue.main.async {
-				print("[updateNSView] ASYNC initial setup — bounds=\(outlineView.bounds)")
 				CATransaction.begin()
 				CATransaction.setDisableActions(true)
 
@@ -84,7 +83,6 @@ struct Outliner: NSViewRepresentable {
 				}
 
 				CATransaction.commit()
-				print("[updateNSView] ASYNC initial setup done")
 			}
 		}
 	}
@@ -412,7 +410,6 @@ struct Outliner: NSViewRepresentable {
 
 			let minHeight = ceil(NSFont.systemFont(ofSize: fontSize).boundingRectForFont.height)
 			let result = max(minHeight, usedRect.height)
-			print("[heightOfRow] text=\"\(node.text.prefix(30))\" bounds.width=\(outlineView.bounds.width) col.width=\(outlineView.tableColumns[0].width) columnWidth=\(columnWidth) height=\(result)")
 			return result
 		}
 
@@ -481,21 +478,6 @@ struct Outliner: NSViewRepresentable {
 
 			textView.string = node.text
 			textView.font = NSFont.systemFont(ofSize: node.isRoot() ? 26 : 13)
-
-			if !textView.postsFrameChangedNotifications {
-				textView.postsFrameChangedNotifications = true
-				let row = outlineView.row(forItem: item)
-				print("[viewFor] ADDING frame observer for row=\(row) item=\"\((item as? OutlinerNode)?.text.prefix(20) ?? "")\" initial frame=\(textView.frame)")
-				NotificationCenter.default.addObserver(
-					forName: NSView.frameDidChangeNotification,
-					object: textView,
-					queue: .main
-				) { note in
-					if let tv = note.object as? NSView {
-						print("[frameChanged] row=\(outlineView.row(for: tv)) frame=\(tv.frame)")
-					}
-				}
-			}
 
 			if let outlinerCell = cell as? OutlinerCellView {
 				let hasChildren = !node.children.isEmpty

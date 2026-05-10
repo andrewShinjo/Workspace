@@ -62,27 +62,27 @@ struct Outliner: NSViewRepresentable {
 
 		if context.coordinator.lastDocument !== document {
 			context.coordinator.lastDocument = document
-			context.coordinator.hasExpandedRoot = false
 			context.coordinator.resubscribe()
-			outlineView.reloadData()
-		}
+			DispatchQueue.main.async {
+				CATransaction.begin()
+				CATransaction.setDisableActions(true)
 
-		DispatchQueue.main.async {
-			let rows = IndexSet(integersIn: 0..<outlineView.numberOfRows)
-			outlineView.noteHeightOfRows(withIndexesChanged: rows)
-		}
-		let coordinator = context.coordinator
-		if !coordinator.hasExpandedRoot {
-			coordinator.hasExpandedRoot = true
-			let rootNode = document.rootNode
-			if !rootNode.children.isEmpty {
-				DispatchQueue.main.async {
+				context.coordinator.hasExpandedRoot = true
+				outlineView.reloadData()
+
+				let rows = IndexSet(integersIn: 0..<outlineView.numberOfRows)
+				outlineView.noteHeightOfRows(withIndexesChanged: rows)
+
+				let rootNode = document.rootNode
+				if !rootNode.children.isEmpty {
 					outlineView.expandItem(rootNode)
 					let rootRow = outlineView.row(forItem: rootNode)
 					if rootRow >= 0 {
 						outlineView.reloadData(forRowIndexes: IndexSet(integer: rootRow), columnIndexes: IndexSet(integer: 0))
 					}
 				}
+
+				CATransaction.commit()
 			}
 		}
 	}
@@ -456,8 +456,12 @@ struct Outliner: NSViewRepresentable {
 
 				textView.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
 
-				// Optional debug border (can be removed)
 				textView.wantsLayer = true
+				textView.layer?.actions = [
+					"bounds": NSNull(),
+					"position": NSNull(),
+					"frame": NSNull()
+				]
 				textView.layer?.borderWidth = 1
 				textView.layer?.borderColor = NSColor.red.cgColor
 

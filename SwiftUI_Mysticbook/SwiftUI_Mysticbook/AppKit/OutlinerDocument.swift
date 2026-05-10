@@ -6,14 +6,21 @@
 //
 
 import AppKit
+import Combine
 import Foundation
 
 class OutlinerDocument {
 	
 	let rootNode: OutlinerNode
+	let objectDidChange = PassthroughSubject<Void, Never>()
 	
 	init(rootNode: OutlinerNode) {
 		self.rootNode = rootNode
+	}
+	
+	func updateNodeText(_ node: OutlinerNode, text: String) {
+		node.text = text
+		objectDidChange.send()
 	}
 	
 	func indentNode(_ node: OutlinerNode) {
@@ -39,6 +46,7 @@ class OutlinerDocument {
 		let newParent = parent.children[index - 1]
 		newParent.children.append(node)
 		node.parent = newParent
+		objectDidChange.send()
 	}
 	
 	func unindentNode(_ node: OutlinerNode) {
@@ -77,7 +85,7 @@ class OutlinerDocument {
 		
 		// Update the node's new parent.
 		node.parent = grandparent
-		
+		objectDidChange.send()
 	}
 	
 	func mergeNode(_ node: OutlinerNode) {
@@ -101,11 +109,13 @@ class OutlinerDocument {
 		}
 		
 		parent.children.remove(at: index)
+		objectDidChange.send()
 	}
 	
 	@discardableResult
 	func splitNode(after node: OutlinerNode, in textView: NSTextView)
 	-> (parent: OutlinerNode, index: Int) {
+		defer { objectDidChange.send() }
 		
 		let isRoot = node.isRoot()
 		let selectedRange = textView.selectedRange()

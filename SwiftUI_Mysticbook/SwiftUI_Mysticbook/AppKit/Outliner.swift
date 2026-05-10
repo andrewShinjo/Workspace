@@ -5,6 +5,7 @@
 //  Created by Andrew Shinjo on 4/12/26.
 //
 
+import Combine
 import SwiftUI
 import AppKit
 
@@ -45,10 +46,12 @@ struct Outliner: NSViewRepresentable {
 					let outlineView = scrollView.documentView as? NSOutlineView else { return }
 
 		context.coordinator.parent = self
+		context.coordinator.outlineView = outlineView
 
 		if context.coordinator.lastDocument !== document {
 			context.coordinator.lastDocument = document
 			context.coordinator.hasExpandedRoot = false
+			context.coordinator.resubscribe()
 			outlineView.reloadData()
 		}
 
@@ -90,6 +93,22 @@ struct Outliner: NSViewRepresentable {
 
 		var hasExpandedRoot = false
 		var lastDocument: OutlinerDocument?
+		weak var outlineView: NSOutlineView?
+		var changeCancellable: AnyCancellable?
+
+		func resubscribe() {
+			changeCancellable = parent.document.objectDidChange
+				.receive(on: DispatchQueue.main)
+				.sink { [weak self] _ in
+					guard let self, let ov = self.outlineView else { return }
+					let isEditing: Bool = {
+						guard let fr = ov.window?.firstResponder as? NSTextView else { return false }
+						return fr.isDescendant(of: ov)
+					}()
+					if isEditing { return }
+					ov.reloadData()
+				}
+		}
 
 		// MARK: - NSTextViewDelegate
 
@@ -109,7 +128,7 @@ struct Outliner: NSViewRepresentable {
 
 			if let node = outlineView.item(atRow: rowIndex) as? OutlinerNode,
 				 node.text != textView.string {
-				node.text = textView.string
+				parent.document.updateNodeText(node, text: textView.string)
 				if let url = parent.saveURL {
 				autoSave(document: parent.document, to: url)
 			}

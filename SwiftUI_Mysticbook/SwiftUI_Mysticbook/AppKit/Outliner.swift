@@ -41,7 +41,6 @@ struct Outliner: NSViewRepresentable {
 		scrollView.horizontalScrollElasticity = .none
 
 		outlineView.sizeLastColumnToFit()
-		outlineView.columnAutoresizingStyle = .uniformColumnAutoresizingStyle
 
 		outlineView.translatesAutoresizingMaskIntoConstraints = false
 		NSLayoutConstraint.activate([
@@ -49,6 +48,12 @@ struct Outliner: NSViewRepresentable {
 			outlineView.trailingAnchor.constraint(equalTo: scrollView.contentView.trailingAnchor),
 			outlineView.topAnchor.constraint(equalTo: scrollView.contentView.topAnchor),
 		])
+
+		NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification, object: scrollView, queue: .main) { _ in
+			outlineView.sizeLastColumnToFit()
+			column.minWidth = column.width
+			column.maxWidth = column.width
+		}
 
 		return scrollView
 	}
@@ -66,6 +71,11 @@ struct Outliner: NSViewRepresentable {
 			DispatchQueue.main.async {
 				CATransaction.begin()
 				CATransaction.setDisableActions(true)
+
+				let col = outlineView.tableColumns[0]
+				outlineView.sizeLastColumnToFit()
+				col.minWidth = col.width
+				col.maxWidth = col.width
 
 				context.coordinator.hasExpandedRoot = true
 				outlineView.reloadData()

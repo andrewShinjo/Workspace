@@ -210,6 +210,15 @@ extension PanelModel {
 		}
 	}
 
+	func allTabTitles() -> Set<String> {
+		switch self {
+		case .leaf(_, let tabs, _):
+			return Set(tabs.map(\.title))
+		case .split(_, _, let first, let second, _):
+			return first.allTabTitles().union(second.allTabTitles())
+		}
+	}
+
 	func replaceTab(in panelId: UUID, at index: Int, with tab: TabItem) -> PanelModel {
 		switch self {
 		case .leaf(let id, let tabs, let selectedIndex):
@@ -552,12 +561,15 @@ class PanelViewModel: ObservableObject {
 		}
 	}
 
-	func addTab(to panelId: UUID) {
-		let tab = TabItem(id: UUID(), title: "New Tab")
+	@discardableResult
+	func addTab(to panelId: UUID, title: String = "New Tab") -> UUID {
+		let tabId = UUID()
+		let tab = TabItem(id: tabId, title: title)
 		rootPanel = rootPanel.addTab(to: panelId, tab: tab)
 		if let leaf = rootPanel.findLeaf(panelId: panelId) {
 			rootPanel = rootPanel.selectTab(in: panelId, at: leaf.tabs.count - 1)
 		}
+		return tabId
 	}
 
 	func replaceTab(in panelId: UUID, at index: Int, with tab: TabItem) {

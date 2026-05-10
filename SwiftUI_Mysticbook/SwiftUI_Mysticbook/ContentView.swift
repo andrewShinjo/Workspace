@@ -77,6 +77,13 @@ struct ContentView: View {
 			}
 
 			Button("") {
+				createNewUntitledTab()
+			}
+			.keyboardShortcut("n", modifiers: .command)
+			.opacity(0)
+			.frame(width: 0, height: 0)
+
+			Button("") {
 				let panelId = panelVM.activePanelId ?? panelVM.rootPanel.firstLeafId()
 				if let panelId { panelVM.addTab(to: panelId) }
 			}
@@ -97,6 +104,31 @@ struct ContentView: View {
 			.opacity(0)
 			.frame(width: 0, height: 0)
 		}
+	}
+
+	private func createNewUntitledTab() {
+		guard let panelId = panelVM.activePanelId ?? panelVM.rootPanel.firstLeafId() else { return }
+
+		let existingTitles = panelVM.rootPanel.allTabTitles()
+
+		var index = 0
+		let baseName = "Untitled"
+		var candidate: String
+		repeat {
+			let suffix = index == 0 ? "" : " \(index)"
+			candidate = "\(baseName)\(suffix).org"
+			index += 1
+		} while existingTitles.contains(candidate) || fileExistsOnDisk(candidate)
+
+		let document = OutlinerDocument(rootNode: OutlinerNode(text: ""))
+		let tabId = panelVM.addTab(to: panelId, title: candidate)
+		tabDocuments[tabId] = document
+	}
+
+	private func fileExistsOnDisk(_ filename: String) -> Bool {
+		guard let dir = workspace.directoryURL else { return false }
+		let url = dir.appendingPathComponent(filename)
+		return FileManager.default.fileExists(atPath: url.path)
 	}
 
 	private func openFileInActivePanel(_ url: URL) {

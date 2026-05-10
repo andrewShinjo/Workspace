@@ -1,10 +1,3 @@
-//
-//  ContentView.swift
-//  SwiftUI_Mysticbook
-//
-//  Created by Andrew Shinjo on 4/11/26.
-//
-
 import SwiftUI
 
 struct ContentView: View {
@@ -35,24 +28,74 @@ struct ContentView: View {
 		return vm
 	}()
 
+	@State private var tabDocuments: [UUID: OutlinerDocument] = [:]
+	@State private var tabDocumentURLs: [UUID: URL] = [:]
+
 	var body: some View {
-		PanelView(
-			rootPanel: panelVM.rootPanel,
-			leafContent: { id, tabItem in
-				ZStack {
-					(id == Self.tealLeaf ? Color.teal.opacity(0.2) :
-						id == Self.indigoLeaf ? Color.indigo.opacity(0.2) :
-						Color.orange.opacity(0.2))
-					Text(tabItem.title)
-						.font(.caption)
-						.foregroundStyle(.secondary)
-				}
-			},
-			selectTab: { panelVM.selectTab(panelId: $0, at: $1) },
-			closeTab: { panelVM.closeTab(panelId: $0, at: $1) },
-			addTab: { panelVM.addTab(to: $0) },
-			resizeSplit: { panelVM.resize(splitId: $0, newFraction: $1) }
-		)
+		ZStack {
+			PanelView(
+				rootPanel: panelVM.rootPanel,
+				leafContent: { id, tabItem in
+					if let document = tabDocuments[tabItem.id] {
+						Outliner(document: document, saveURL: tabDocumentURLs[tabItem.id])
+							.id(tabItem.id)
+					} else {
+						ZStack {
+							(id == Self.tealLeaf ? Color.teal.opacity(0.2) :
+								id == Self.indigoLeaf ? Color.indigo.opacity(0.2) :
+								Color.orange.opacity(0.2))
+							Text(tabItem.title)
+								.font(.caption)
+								.foregroundStyle(.secondary)
+						}
+					}
+				},
+				selectTab: { panelVM.selectTab(panelId: $0, at: $1) },
+				closeTab: { panelId, index in
+					if let leaf = panelVM.rootPanel.findLeaf(panelId: panelId),
+					   index < leaf.tabs.count {
+						let oldId = leaf.tabs[index].id
+						tabDocuments.removeValue(forKey: oldId)
+						tabDocumentURLs.removeValue(forKey: oldId)
+					}
+					panelVM.closeTab(panelId: panelId, at: index)
+				},
+				addTab: { panelVM.addTab(to: $0) },
+				resizeSplit: { panelVM.resize(splitId: $0, newFraction: $1) },
+				onFocusPanel: { panelVM.activePanelId = $0 }
+			)
+
+			if showCommandPalette {
+				CommandPaletteView(
+					isPresented: $showCommandPalette,
+					files: workspace.fileItems,
+					workspaceDirectoryURL: workspace.directoryURL,
+					onSelectFile: openFileInActivePanel
+				)
+			}
+		}
+	}
+
+	private func openFileInActivePanel(_ url: URL) {
+		guard let document = try? orgDeserialize(String(contentsOf: url)) else { return }
+
+		let panelId = panelVM.activePanelId ?? panelVM.rootPanel.firstLeafId()
+		guard let panelId else { return }
+
+		guard let leaf = panelVM.rootPanel.findLeaf(panelId: panelId) else { return }
+		let tabIndex = leaf.selectedTabIndex
+		let oldTabId = leaf.tabs[tabIndex].id
+
+		tabDocuments.removeValue(forKey: oldTabId)
+		tabDocumentURLs.removeValue(forKey: oldTabId)
+
+		let newTabId = UUID()
+		let tab = TabItem(id: newTabId, title: url.lastPathComponent)
+
+		tabDocuments[newTabId] = document
+		tabDocumentURLs[newTabId] = url
+
+		panelVM.replaceTab(in: panelId, at: tabIndex, with: tab)
 	}
 }
 

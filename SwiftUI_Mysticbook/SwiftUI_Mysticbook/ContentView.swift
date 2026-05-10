@@ -50,7 +50,8 @@ struct ContentView: View {
 			},
 			selectTab: { panelVM.selectTab(panelId: $0, at: $1) },
 			closeTab: { panelVM.closeTab(panelId: $0, at: $1) },
-			addTab: { panelVM.addTab(to: $0) }
+			addTab: { panelVM.addTab(to: $0) },
+			resizeSplit: { panelVM.resize(splitId: $0, newFraction: $1) }
 		)
 	}
 }

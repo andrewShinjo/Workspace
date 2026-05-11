@@ -29,6 +29,7 @@ enum SplitDirection: String, Codable {
 struct TabItem: Identifiable, Equatable, Codable {
 	let id: UUID
 	var title: String
+	var isFlashcard: Bool = false
 }
 
 // MARK: - Panel Model
@@ -901,9 +902,9 @@ class PanelViewModel: ObservableObject {
 	}
 
 	@discardableResult
-	func addTab(to panelId: UUID, title: String = "New Tab") -> UUID {
+	func addTab(to panelId: UUID, title: String = "New Tab", isFlashcard: Bool = false) -> UUID {
 		let tabId = UUID()
-		let tab = TabItem(id: tabId, title: title)
+		let tab = TabItem(id: tabId, title: title, isFlashcard: isFlashcard)
 		rootPanel = rootPanel.addTab(to: panelId, tab: tab)
 		if let leaf = rootPanel.findLeaf(panelId: panelId) {
 			rootPanel = rootPanel.selectTab(in: panelId, at: leaf.tabs.count - 1)

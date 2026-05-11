@@ -1,9 +1,11 @@
 import SwiftUI
 
 private struct SidebarButtonBar: View {
+	let onOpenFlashcards: () -> Void
+
 	var body: some View {
 		VStack(spacing: 0) {
-			Button(action: {}) {
+			Button(action: onOpenFlashcards) {
 				Image(systemName: "rectangle.on.rectangle")
 					.font(.system(size: 13, weight: .medium))
 			}
@@ -26,6 +28,73 @@ private struct SidebarButtonBar: View {
 	}
 }
 
+private struct FlashcardTabView: View {
+	let workspaceDirectoryURL: URL?
+
+	@State private var flashcardCount = 0
+	@State private var isLoading = true
+
+	var body: some View {
+		VStack(spacing: 20) {
+			Image(systemName: "rectangle.on.rectangle")
+				.font(.system(size: 48))
+				.foregroundColor(.secondary)
+
+			if isLoading {
+				ProgressView("Scanning for flashcards...")
+			} else {
+				Text("Flashcards")
+					.font(.title2)
+
+				Button("Study Flashcards: \(flashcardCount)") {
+					// Future: open study UI
+				}
+				.buttonStyle(.borderedProminent)
+				.disabled(flashcardCount == 0)
+			}
+		}
+		.frame(maxWidth: .infinity, maxHeight: .infinity)
+		.task {
+			await scanFlashcards()
+		}
+	}
+
+	private func scanFlashcards() async {
+		guard let directoryURL = workspaceDirectoryURL else {
+			isLoading = false
+			return
+		}
+
+		let count = await Task.detached { () -> Int in
+			var total = 0
+			guard let enumerator = FileManager.default.enumerator(
+				at: directoryURL,
+				includingPropertiesForKeys: nil,
+				options: [.skipsHiddenFiles]
+			) else { return 0 }
+
+			while let fileURL = enumerator.nextObject() as? URL {
+				guard fileURL.pathExtension == "org" else { continue }
+				guard let content = try? String(contentsOf: fileURL) else { continue }
+				let document = orgDeserialize(content)
+				total += countFlashcards(in: document.rootNode)
+			}
+			return total
+		}.value
+
+		flashcardCount = count
+		isLoading = false
+	}
+
+	private func countFlashcards(in node: OutlinerNode) -> Int {
+		var count = FlashcardDeck.extract(from: node.text) != nil ? 1 : 0
+		for child in node.children {
+			count += countFlashcards(in: child)
+		}
+		return count
+	}
+}
+
 struct ContentView: View {
 
 	@Binding var showCommandPalette: Bool
@@ -41,14 +110,17 @@ struct ContentView: View {
 
 	var body: some View {
 		HStack(spacing: 0) {
-			SidebarButtonBar()
+			SidebarButtonBar(onOpenFlashcards: openFlashcards)
 
 			ZStack {
 				PanelView(
 					rootPanel: panelVM.rootPanel,
 					activePanelId: panelVM.activePanelId,
 					leafContent: { id, tabItem in
-						if let document = tabDocuments[tabItem.id] {
+						if tabItem.isFlashcard || tabItem.title == "Flashcards" {
+							FlashcardTabView(workspaceDirectoryURL: workspace.directoryURL)
+								.id(tabItem.id)
+						} else if let document = tabDocuments[tabItem.id] {
 							Outliner(document: document, saveURL: tabDocumentURLs[tabItem.id])
 								.id(tabItem.id)
 						} else {
@@ -126,6 +198,36 @@ struct ContentView: View {
 		.onChange(of: workspace.directoryURL) { _ in
 			restorePanelState()
 		}
+		.onChange(of: showFlashcardPane) { newValue in
+			if newValue {
+				openFlashcards()
+				showFlashcardPane = false
+			}
+		}
+	}
+
+	private func openFlashcards() {
+		guard let panelId = panelVM.activePanelId ?? panelVM.rootPanel.firstLeafId() else {
+			print("[openFlashcards] no active panel")
+			return
+		}
+		guard let leaf = panelVM.rootPanel.findLeaf(panelId: panelId) else {
+			print("[openFlashcards] no leaf for panel \(panelId)")
+			return
+		}
+
+		print("[openFlashcards] panel \(panelId) has \(leaf.tabs.count) tabs")
+		for (index, tab) in leaf.tabs.enumerated() {
+			print("[openFlashcards]   tab[\(index)]: id=\(tab.id) title='\(tab.title)' isFlashcard=\(tab.isFlashcard)")
+			if tab.isFlashcard || tab.title == "Flashcards" {
+				print("[openFlashcards] found existing flashcard tab at index \(index), selecting it")
+				panelVM.selectTab(panelId: panelId, at: index)
+				return
+			}
+		}
+
+		print("[openFlashcards] creating new flashcard tab")
+		panelVM.addTab(to: panelId, title: "Flashcards", isFlashcard: true)
 	}
 
 	private func createNewUntitledTab() {
@@ -183,11 +285,21 @@ struct ContentView: View {
 	}
 
 	private func restorePanelState() {
-		guard let dir = workspace.directoryURL else { return }
+		guard let dir = workspace.directoryURL else {
+			print("[restorePanelState] no directory URL")
+			return
+		}
 		let stateURL = dir.appendingPathComponent(".mysticbook_state")
-		guard FileManager.default.fileExists(atPath: stateURL.path) else { return }
+		guard FileManager.default.fileExists(atPath: stateURL.path) else {
+			print("[restorePanelState] no state file at \(stateURL.path)")
+			return
+		}
 
-		guard let tabFiles = try? panelVM.restoreState(from: stateURL) else { return }
+		guard let tabFiles = try? panelVM.restoreState(from: stateURL) else {
+			print("[restorePanelState] failed to restore state")
+			return
+		}
+		print("[restorePanelState] restored \(tabFiles.count) file tabs")
 
 		for (tabId, relativePath) in tabFiles {
 			let url = dir.appendingPathComponent(relativePath)
@@ -206,7 +318,7 @@ struct ContentView: View {
 			switch panel {
 			case .leaf(_, let tabs, _):
 				for tab in tabs where tabDocuments[tab.id] == nil {
-					tabDocuments[tab.id] = OutlinerDocument(rootNode: OutlinerNode(text: ""))
+					print("[populateUntitledTabDocuments] tab '\(tab.title)' has no document, leaving as placeholder")
 				}
 			case .split(_, _, let first, let second, _):
 				populate(first)

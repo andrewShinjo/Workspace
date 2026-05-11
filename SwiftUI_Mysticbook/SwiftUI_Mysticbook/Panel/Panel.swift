@@ -8,24 +8,33 @@
 import Combine
 import Foundation
 import SwiftUI
+import UniformTypeIdentifiers
+
+// MARK: - Tab Drag State (shared reference for synchronous drag-drop data transfer)
+
+class TabDragState {
+	var sourcePanelId: UUID?
+	var sourceTabIndex: Int?
+}
 
 // MARK: - Split Direction
 
-enum SplitDirection {
+enum SplitDirection: String, Codable {
 	case horizontal
 	case vertical
 }
 
 // MARK: - Tab Item
 
-struct TabItem: Identifiable, Equatable {
+struct TabItem: Identifiable, Equatable, Codable {
 	let id: UUID
 	var title: String
+	var isFlashcard: Bool = false
 }
 
 // MARK: - Panel Model
 
-indirect enum PanelModel: Equatable {
+indirect enum PanelModel: Equatable, Codable {
 	case leaf(id: UUID, tabs: [TabItem], selectedTabIndex: Int)
 	case split(
 		id: UUID,
@@ -41,6 +50,45 @@ indirect enum PanelModel: Equatable {
 			return id
 		case .split(let id, _, _, _, _):
 			return id
+		}
+	}
+
+	enum CodingKeys: String, CodingKey {
+		case leaf
+		case split
+	}
+
+	struct LeafRep: Codable {
+		var id: UUID
+		var tabs: [TabItem]
+		var selectedTabIndex: Int
+	}
+
+	struct SplitRep: Codable {
+		var id: UUID
+		var direction: SplitDirection
+		var first: PanelModel
+		var second: PanelModel
+		var fraction: CGFloat
+	}
+
+	func encode(to encoder: Encoder) throws {
+		var container = encoder.container(keyedBy: CodingKeys.self)
+		switch self {
+		case .leaf(let id, let tabs, let selectedTabIndex):
+			try container.encode(LeafRep(id: id, tabs: tabs, selectedTabIndex: selectedTabIndex), forKey: .leaf)
+		case .split(let id, let direction, let first, let second, let fraction):
+			try container.encode(SplitRep(id: id, direction: direction, first: first, second: second, fraction: fraction), forKey: .split)
+		}
+	}
+
+	init(from decoder: Decoder) throws {
+		let container = try decoder.container(keyedBy: CodingKeys.self)
+		if let leaf = try container.decodeIfPresent(LeafRep.self, forKey: .leaf) {
+			self = .leaf(id: leaf.id, tabs: leaf.tabs, selectedTabIndex: leaf.selectedTabIndex)
+		} else {
+			let split = try container.decode(SplitRep.self, forKey: .split)
+			self = .split(id: split.id, direction: split.direction, first: split.first, second: split.second, fraction: split.fraction)
 		}
 	}
 }
@@ -99,6 +147,30 @@ extension PanelModel {
 				return self
 			}
 			return .split(id: id, direction: direction, first: newFirst, second: newSecond, fraction: fraction)
+		}
+	}
+
+	func splitLeafAndAddTab(panelId: UUID, direction: SplitDirection, tab: TabItem, tabInFirst: Bool) -> PanelModel {
+		switch self {
+		case .leaf(let id, let tabs, let selectedIndex):
+			guard id == panelId else { return self }
+			let newLeafId = UUID()
+			let existingLeaf: PanelModel = .leaf(id: id, tabs: tabs, selectedTabIndex: selectedIndex)
+			let newLeaf: PanelModel = .leaf(id: newLeafId, tabs: [tab], selectedTabIndex: 0)
+			return .split(
+				id: UUID(),
+				direction: direction,
+				first: tabInFirst ? newLeaf : existingLeaf,
+				second: tabInFirst ? existingLeaf : newLeaf,
+				fraction: 0.5
+			)
+		case .split(let id, let splitDir, let first, let second, let fraction):
+			let newFirst = first.splitLeafAndAddTab(panelId: panelId, direction: direction, tab: tab, tabInFirst: tabInFirst)
+			let newSecond = second.splitLeafAndAddTab(panelId: panelId, direction: direction, tab: tab, tabInFirst: tabInFirst)
+			if newFirst == first && newSecond == second {
+				return self
+			}
+			return .split(id: id, direction: splitDir, first: newFirst, second: newSecond, fraction: fraction)
 		}
 	}
 
@@ -186,6 +258,23 @@ extension PanelModel {
 			return .split(id: id, direction: direction, first: newFirst, second: newSecond, fraction: fraction)
 		}
 	}
+
+	func addTab(to panelId: UUID, tab: TabItem, at index: Int) -> PanelModel {
+		switch self {
+		case .leaf(let id, let tabs, _):
+			guard id == panelId else { return self }
+			var newTabs = tabs
+			newTabs.insert(tab, at: min(index, tabs.count))
+			return .leaf(id: id, tabs: newTabs, selectedTabIndex: min(index, tabs.count))
+		case .split(let id, let direction, let first, let second, let fraction):
+			let newFirst = first.addTab(to: panelId, tab: tab, at: index)
+			let newSecond = second.addTab(to: panelId, tab: tab, at: index)
+			if newFirst == first && newSecond == second {
+				return self
+			}
+			return .split(id: id, direction: direction, first: newFirst, second: newSecond, fraction: fraction)
+		}
+	}
 }
 
 // MARK: - Panel Model Helpers
@@ -210,6 +299,15 @@ extension PanelModel {
 		}
 	}
 
+	func allTabTitles() -> Set<String> {
+		switch self {
+		case .leaf(_, let tabs, _):
+			return Set(tabs.map(\.title))
+		case .split(_, _, let first, let second, _):
+			return first.allTabTitles().union(second.allTabTitles())
+		}
+	}
+
 	func replaceTab(in panelId: UUID, at index: Int, with tab: TabItem) -> PanelModel {
 		switch self {
 		case .leaf(let id, let tabs, let selectedIndex):
@@ -220,6 +318,79 @@ extension PanelModel {
 		case .split(let id, let direction, let first, let second, let fraction):
 			let newFirst = first.replaceTab(in: panelId, at: index, with: tab)
 			let newSecond = second.replaceTab(in: panelId, at: index, with: tab)
+			if newFirst == first && newSecond == second {
+				return self
+			}
+			return .split(id: id, direction: direction, first: newFirst, second: newSecond, fraction: fraction)
+		}
+	}
+
+	// MARK: - Tab Movement
+
+	func extractingTab(from sourcePanelId: UUID, at sourceIndex: Int) -> (newModel: PanelModel, tab: TabItem)? {
+		switch self {
+		case .leaf(let id, let tabs, let selectedIndex):
+			guard id == sourcePanelId, sourceIndex < tabs.count else { return nil }
+			let tab = tabs[sourceIndex]
+			var newTabs = tabs
+			newTabs.remove(at: sourceIndex)
+			let newSelected: Int
+			if newTabs.isEmpty {
+				newSelected = 0
+			} else if selectedIndex >= newTabs.count {
+				newSelected = newTabs.count - 1
+			} else if selectedIndex > sourceIndex {
+				newSelected = selectedIndex - 1
+			} else {
+				newSelected = selectedIndex
+			}
+			return (.leaf(id: id, tabs: newTabs, selectedTabIndex: newSelected), tab)
+		case .split(let id, let direction, let first, let second, let fraction):
+			if let result = first.extractingTab(from: sourcePanelId, at: sourceIndex) {
+				if case .leaf(_, let ftabs, _) = result.newModel, ftabs.isEmpty {
+					return (second, result.tab)
+				}
+				return (.split(id: id, direction: direction, first: result.newModel, second: second, fraction: fraction), result.tab)
+			}
+			if let result = second.extractingTab(from: sourcePanelId, at: sourceIndex) {
+				if case .leaf(_, let stabs, _) = result.newModel, stabs.isEmpty {
+					return (first, result.tab)
+				}
+				return (.split(id: id, direction: direction, first: first, second: result.newModel, fraction: fraction), result.tab)
+			}
+			return nil
+		}
+	}
+
+	func moveTab(from sourcePanelId: UUID, at sourceIndex: Int, to destPanelId: UUID, at destIndex: Int) -> PanelModel {
+		guard sourcePanelId != destPanelId || sourceIndex != destIndex else { return self }
+		if sourcePanelId == destPanelId {
+			return reorderTabs(in: sourcePanelId, from: sourceIndex, to: destIndex)
+		}
+		guard let (tempModel, tab) = extractingTab(from: sourcePanelId, at: sourceIndex) else { return self }
+		return tempModel.addTab(to: destPanelId, tab: tab, at: destIndex)
+	}
+
+	private func reorderTabs(in panelId: UUID, from sourceIndex: Int, to destIndex: Int) -> PanelModel {
+		switch self {
+		case .leaf(let id, let tabs, let selectedIndex):
+			guard id == panelId, sourceIndex < tabs.count, destIndex <= tabs.count else { return self }
+			var newTabs = tabs
+			let tab = newTabs.remove(at: sourceIndex)
+			let adjustedDest = sourceIndex < destIndex ? destIndex - 1 : destIndex
+			newTabs.insert(tab, at: min(adjustedDest, newTabs.count))
+			let newSelected: Int
+			if selectedIndex == sourceIndex {
+				newSelected = min(adjustedDest, newTabs.count - 1)
+			} else if selectedIndex > sourceIndex && selectedIndex <= adjustedDest {
+				newSelected = selectedIndex - 1
+			} else {
+				newSelected = selectedIndex
+			}
+			return .leaf(id: id, tabs: newTabs, selectedTabIndex: newSelected)
+		case .split(let id, let direction, let first, let second, let fraction):
+			let newFirst = first.reorderTabs(in: panelId, from: sourceIndex, to: destIndex)
+			let newSecond = second.reorderTabs(in: panelId, from: sourceIndex, to: destIndex)
 			if newFirst == first && newSecond == second {
 				return self
 			}
@@ -240,6 +411,9 @@ struct PanelView<Content: View>: View {
 	let addTab: (UUID) -> Void
 	let resizeSplit: (UUID, CGFloat) -> Void
 	let onFocusPanel: (UUID) -> Void
+	let moveTab: (UUID, Int, UUID, Int) -> Void
+	let moveTabToSplit: (UUID, Int, UUID, SplitDirection, Bool) -> Void
+	let dragState: TabDragState
 
 	init(
 		rootPanel: PanelModel,
@@ -250,7 +424,10 @@ struct PanelView<Content: View>: View {
 		closeTab: @escaping (UUID, Int) -> Void = { _, _ in },
 		addTab: @escaping (UUID) -> Void = { _ in },
 		resizeSplit: @escaping (UUID, CGFloat) -> Void = { _, _ in },
-		onFocusPanel: @escaping (UUID) -> Void = { _ in }
+		onFocusPanel: @escaping (UUID) -> Void = { _ in },
+		moveTab: @escaping (UUID, Int, UUID, Int) -> Void = { _, _, _, _ in },
+		moveTabToSplit: @escaping (UUID, Int, UUID, SplitDirection, Bool) -> Void = { _, _, _, _, _ in },
+		dragState: TabDragState = TabDragState()
 	) {
 		self.rootPanel = rootPanel
 		self.activePanelId = activePanelId
@@ -261,6 +438,9 @@ struct PanelView<Content: View>: View {
 		self.addTab = addTab
 		self.resizeSplit = resizeSplit
 		self.onFocusPanel = onFocusPanel
+		self.moveTab = moveTab
+		self.moveTabToSplit = moveTabToSplit
+		self.dragState = dragState
 	}
 
 	var body: some View {
@@ -278,13 +458,55 @@ struct PanelView<Content: View>: View {
 		VStack(spacing: 0) {
 			tabBar(id: id, tabs: tabs, selectedTabIndex: selectedTabIndex)
 			if tabs.indices.contains(selectedTabIndex) {
-				leafContent(id, tabs[selectedTabIndex])
-					.frame(maxWidth: .infinity, maxHeight: .infinity)
-					.onTapGesture { onFocusPanel(id) }
-					.overlay(
-						RoundedRectangle(cornerRadius: 4)
-							.stroke(id == activePanelId ? Color.accentColor : Color.clear, lineWidth: 2)
+				ZStack {
+					leafContent(id, tabs[selectedTabIndex])
+						.frame(maxWidth: .infinity, maxHeight: .infinity)
+						.onTapGesture { onFocusPanel(id) }
+
+					RoundedRectangle(cornerRadius: 4)
+						.stroke(id == activePanelId ? Color.accentColor : Color.clear, lineWidth: 2)
+						.allowsHitTesting(false)
+
+					EdgeDropZone(
+						panelId: id,
+						direction: .horizontal,
+						tabInFirst: true,
+						dragState: dragState,
+						moveTabToSplit: moveTabToSplit
 					)
+					.frame(width: 20)
+					.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+
+					EdgeDropZone(
+						panelId: id,
+						direction: .horizontal,
+						tabInFirst: false,
+						dragState: dragState,
+						moveTabToSplit: moveTabToSplit
+					)
+					.frame(width: 20)
+					.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+
+					EdgeDropZone(
+						panelId: id,
+						direction: .vertical,
+						tabInFirst: true,
+						dragState: dragState,
+						moveTabToSplit: moveTabToSplit
+					)
+					.frame(height: 20)
+					.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+
+					EdgeDropZone(
+						panelId: id,
+						direction: .vertical,
+						tabInFirst: false,
+						dragState: dragState,
+						moveTabToSplit: moveTabToSplit
+					)
+					.frame(height: 20)
+					.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+				}
 			}
 		}
 	}
@@ -293,8 +515,28 @@ struct PanelView<Content: View>: View {
 	func tabBar(id: UUID, tabs: [TabItem], selectedTabIndex: Int) -> some View {
 		HStack(spacing: 0) {
 			ForEach(Array(tabs.enumerated()), id: \.element.id) { index, tab in
+				InsertionDropZone(
+					destPanelId: id,
+					destIndex: index,
+					dragState: dragState,
+					moveTab: moveTab
+				)
+				.frame(width: 12)
 				tabButton(panelId: id, tab: tab, isSelected: index == selectedTabIndex, index: index)
+					.onDrag {
+						dragState.sourcePanelId = id
+						dragState.sourceTabIndex = index
+						let data = "\(id.uuidString):\(index)"
+						return NSItemProvider(object: data as NSString)
+					}
 			}
+			InsertionDropZone(
+				destPanelId: id,
+				destIndex: tabs.count,
+				dragState: dragState,
+				moveTab: moveTab
+			)
+			.frame(width: 12)
 			addTabButton(panelId: id)
 			Spacer(minLength: 0)
 		}
@@ -351,7 +593,10 @@ struct PanelView<Content: View>: View {
 						closeTab: closeTab,
 						addTab: addTab,
 						resizeSplit: resizeSplit,
-						onFocusPanel: onFocusPanel
+						onFocusPanel: onFocusPanel,
+						moveTab: moveTab,
+						moveTabToSplit: moveTabToSplit,
+						dragState: dragState
 					)
 					.frame(width: firstSize, height: geo.size.height)
 					SplitDivider(
@@ -370,7 +615,10 @@ struct PanelView<Content: View>: View {
 						closeTab: closeTab,
 						addTab: addTab,
 						resizeSplit: resizeSplit,
-						onFocusPanel: onFocusPanel
+						onFocusPanel: onFocusPanel,
+						moveTab: moveTab,
+						moveTabToSplit: moveTabToSplit,
+						dragState: dragState
 					)
 					.frame(width: max(0, secondSize), height: geo.size.height)
 				}
@@ -386,7 +634,10 @@ struct PanelView<Content: View>: View {
 						closeTab: closeTab,
 						addTab: addTab,
 						resizeSplit: resizeSplit,
-						onFocusPanel: onFocusPanel
+						onFocusPanel: onFocusPanel,
+						moveTab: moveTab,
+						moveTabToSplit: moveTabToSplit,
+						dragState: dragState
 					)
 					.frame(width: geo.size.width, height: firstSize)
 					SplitDivider(
@@ -405,7 +656,10 @@ struct PanelView<Content: View>: View {
 						closeTab: closeTab,
 						addTab: addTab,
 						resizeSplit: resizeSplit,
-						onFocusPanel: onFocusPanel
+						onFocusPanel: onFocusPanel,
+						moveTab: moveTab,
+						moveTabToSplit: moveTabToSplit,
+						dragState: dragState
 					)
 					.frame(width: geo.size.width, height: max(0, secondSize))
 				}
@@ -519,6 +773,101 @@ private struct SplitDivider: View {
 	}
 }
 
+// MARK: - Insertion Drop Zone
+
+private struct InsertionDropZone: View {
+	let destPanelId: UUID
+	let destIndex: Int
+	let dragState: TabDragState
+	let moveTab: (UUID, Int, UUID, Int) -> Void
+
+	@State private var isTargeted = false
+
+	var body: some View {
+		Color.clear
+			.contentShape(Rectangle())
+			.onDrop(of: [.plainText], isTargeted: $isTargeted) { providers, _ in
+				handleDrop()
+				return true
+			}
+			.overlay(alignment: .leading) {
+				if isTargeted {
+					InsertionIndicator()
+				}
+			}
+	}
+
+	private func handleDrop() {
+		guard let sourceId = dragState.sourcePanelId,
+			  let sourceIndex = dragState.sourceTabIndex else { return }
+		moveTab(sourceId, sourceIndex, destPanelId, destIndex)
+		dragState.sourcePanelId = nil
+		dragState.sourceTabIndex = nil
+	}
+}
+
+// MARK: - Insertion Indicator
+
+private struct InsertionIndicator: View {
+	var body: some View {
+		Rectangle()
+			.fill(Color.accentColor)
+			.frame(width: 2)
+			.padding(.vertical, 4)
+	}
+}
+
+// MARK: - Edge Drop Zone
+
+private struct EdgeDropZone: View {
+	let panelId: UUID
+	let direction: SplitDirection
+	let tabInFirst: Bool
+	let dragState: TabDragState
+	let moveTabToSplit: (UUID, Int, UUID, SplitDirection, Bool) -> Void
+
+	@State private var isTargeted = false
+
+	var body: some View {
+		Rectangle()
+			.fill(isTargeted ? Color.accentColor.opacity(0.12) : Color.clear)
+			.overlay(alignment: direction == .horizontal ? .leading : .top) {
+				if isTargeted {
+					Rectangle()
+						.fill(Color.accentColor)
+						.frame(
+							width: direction == .horizontal ? 3 : nil,
+							height: direction == .vertical ? 3 : nil
+						)
+						.padding(direction == .horizontal ? .vertical : .horizontal, 8)
+				}
+			}
+			.contentShape(Rectangle())
+			.onDrop(of: [.plainText], isTargeted: $isTargeted) { providers, _ in
+				handleDrop()
+				return true
+			}
+			.onHover { hovering in
+				if hovering {
+					(direction == .horizontal
+						? NSCursor.resizeLeftRight
+						: NSCursor.resizeUpDown
+					).push()
+				} else {
+					NSCursor.pop()
+				}
+			}
+	}
+
+	private func handleDrop() {
+		guard let sourceId = dragState.sourcePanelId,
+			  let sourceIndex = dragState.sourceTabIndex else { return }
+		moveTabToSplit(sourceId, sourceIndex, panelId, direction, tabInFirst)
+		dragState.sourcePanelId = nil
+		dragState.sourceTabIndex = nil
+	}
+}
+
 // MARK: - Panel View Model
 
 class PanelViewModel: ObservableObject {
@@ -552,15 +901,52 @@ class PanelViewModel: ObservableObject {
 		}
 	}
 
-	func addTab(to panelId: UUID) {
-		let tab = TabItem(id: UUID(), title: "New Tab")
+	@discardableResult
+	func addTab(to panelId: UUID, title: String = "New Tab", isFlashcard: Bool = false) -> UUID {
+		let tabId = UUID()
+		let tab = TabItem(id: tabId, title: title, isFlashcard: isFlashcard)
 		rootPanel = rootPanel.addTab(to: panelId, tab: tab)
 		if let leaf = rootPanel.findLeaf(panelId: panelId) {
 			rootPanel = rootPanel.selectTab(in: panelId, at: leaf.tabs.count - 1)
 		}
+		return tabId
 	}
 
 	func replaceTab(in panelId: UUID, at index: Int, with tab: TabItem) {
 		rootPanel = rootPanel.replaceTab(in: panelId, at: index, with: tab)
+	}
+
+	func moveTab(from sourcePanelId: UUID, at sourceIndex: Int, to destPanelId: UUID, at destIndex: Int) {
+		rootPanel = rootPanel.moveTab(from: sourcePanelId, at: sourceIndex, to: destPanelId, at: destIndex)
+	}
+
+	func moveTabToSplit(from sourcePanelId: UUID, at sourceIndex: Int, to destPanelId: UUID, direction: SplitDirection, tabInFirst: Bool) {
+		guard let (modelWithoutTab, tab) = rootPanel.extractingTab(from: sourcePanelId, at: sourceIndex) else { return }
+		rootPanel = modelWithoutTab.splitLeafAndAddTab(panelId: destPanelId, direction: direction, tab: tab, tabInFirst: tabInFirst)
+	}
+}
+
+// MARK: - Workspace State (persisted to dot file)
+
+struct WorkspaceState: Codable {
+	var rootPanel: PanelModel
+	var tabFiles: [UUID: String]
+}
+
+// MARK: - Panel View Model State Persistence
+
+extension PanelViewModel {
+	func saveState(to url: URL, tabFiles: [UUID: String]) throws {
+		let state = WorkspaceState(rootPanel: rootPanel, tabFiles: tabFiles)
+		let data = try JSONEncoder().encode(state)
+		try data.write(to: url)
+	}
+
+	@discardableResult
+	func restoreState(from url: URL) throws -> [UUID: String] {
+		let data = try Data(contentsOf: url)
+		let state = try JSONDecoder().decode(WorkspaceState.self, from: data)
+		rootPanel = state.rootPanel
+		return state.tabFiles
 	}
 }

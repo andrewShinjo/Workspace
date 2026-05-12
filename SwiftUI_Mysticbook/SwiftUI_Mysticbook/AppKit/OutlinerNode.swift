@@ -10,6 +10,8 @@ import AppKit
 class OutlinerNode {
 	
 	let id: UUID = UUID()
+	var orgID: String = UUID().uuidString
+	var properties: [String: String] = [:]
 	var text: String
 	var children: [OutlinerNode] = []
 	weak var parent: OutlinerNode?

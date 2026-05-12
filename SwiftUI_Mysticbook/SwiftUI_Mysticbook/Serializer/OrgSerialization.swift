@@ -16,6 +16,16 @@ func orgSerialize(_ document: OutlinerDocument) -> String {
     if !rootParts.heading.isEmpty {
         lines.append("#+TITLE: \(rootParts.heading)")
     }
+
+    var rootPropLines: [String] = []
+    rootPropLines.append(":PROPERTIES:")
+    rootPropLines.append(":ID: \(document.rootNode.orgID)")
+    for (key, value) in document.rootNode.properties where key != "ID" {
+        rootPropLines.append(":\(key): \(value)")
+    }
+    rootPropLines.append(":END:")
+    lines.append(contentsOf: rootPropLines)
+
     if !rootParts.body.isEmpty {
         lines.append(rootParts.body)
     }
@@ -42,6 +52,16 @@ private func serializeNode(_ node: OutlinerNode, depth: Int) -> [String] {
     let parts = splitHeadingAndBody(node.text)
     let stars = String(repeating: "*", count: depth)
     lines.append("\(stars) \(parts.heading)")
+
+    var propLines: [String] = []
+    propLines.append(":PROPERTIES:")
+    propLines.append(":ID: \(node.orgID)")
+    for (key, value) in node.properties where key != "ID" {
+        propLines.append(":\(key): \(value)")
+    }
+    propLines.append(":END:")
+    lines.append(contentsOf: propLines)
+
     if !parts.body.isEmpty {
         lines.append(parts.body)
     }
@@ -49,6 +69,85 @@ private func serializeNode(_ node: OutlinerNode, depth: Int) -> [String] {
         lines.append(contentsOf: serializeNode(child, depth: depth + 1))
     }
     return lines
+}
+
+private func extractProperties(from text: inout String) -> (orgID: String, properties: [String: String]) {
+    var orgID = UUID().uuidString
+    var properties: [String: String] = [:]
+
+    let parts = splitHeadingAndBody(text)
+    let heading = parts.heading
+    var body = parts.body
+
+    guard !body.isEmpty else {
+        return (orgID, properties)
+    }
+
+    let nsBody = body as NSString
+    var searchRange = NSRange(location: 0, length: nsBody.length)
+
+    while true {
+        let propsRange = nsBody.range(of: ":PROPERTIES:", options: [], range: searchRange)
+        if propsRange.location == NSNotFound { break }
+
+        if propsRange.location > 0 {
+            let prevChar = nsBody.substring(with: NSRange(location: propsRange.location - 1, length: 1))
+            guard prevChar == "\n" || prevChar == "\r" else {
+                searchRange = NSRange(location: propsRange.location + 1, length: nsBody.length - propsRange.location - 1)
+                continue
+            }
+        }
+
+        let afterProps = propsRange.location + propsRange.length
+        let remLen = nsBody.length - afterProps
+        let endRange = nsBody.range(of: ":END:", options: [], range: NSRange(location: afterProps, length: remLen))
+        if endRange.location == NSNotFound { break }
+
+        let content = nsBody.substring(with: NSRange(location: afterProps, length: endRange.location - afterProps))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        for line in content.components(separatedBy: "\n") {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard trimmed.hasPrefix(":") else { continue }
+            let rest = trimmed.dropFirst()
+            guard let colonIdx = rest.firstIndex(of: ":") else { continue }
+            let key = rest[..<colonIdx].trimmingCharacters(in: .whitespaces)
+            guard !key.isEmpty, key != "END", key != "PROPERTIES" else { continue }
+            let value = rest[rest.index(after: colonIdx)...].trimmingCharacters(in: .whitespaces)
+            properties[key] = value
+            if key == "ID" { orgID = value }
+        }
+
+        let blockStart: Int
+        if propsRange.location > 0 {
+            let prevChar = nsBody.substring(with: NSRange(location: propsRange.location - 1, length: 1))
+            if prevChar == "\n" || prevChar == "\r" {
+                blockStart = propsRange.location - 1
+            } else {
+                blockStart = propsRange.location
+            }
+        } else {
+            blockStart = 0
+        }
+        let blockEnd = endRange.location + endRange.length
+
+        let beforeBlock = nsBody.substring(with: NSRange(location: 0, length: blockStart))
+        let afterBlock = nsBody.substring(with: NSRange(location: blockEnd, length: nsBody.length - blockEnd))
+        body = beforeBlock + afterBlock
+
+        let nsBody2 = body as NSString
+        searchRange = NSRange(location: blockStart, length: nsBody2.length - blockStart)
+    }
+
+    body = body.trimmingCharacters(in: .newlines)
+
+    if body.isEmpty {
+        text = heading
+    } else {
+        text = heading + "\n" + body
+    }
+
+    return (orgID, properties)
 }
 
 // MARK: - Deserialization
@@ -119,6 +218,16 @@ func orgDeserialize(_ text: String) -> OutlinerDocument {
 					}
         }
     }
+
+    func extractPropertiesFromNode(_ node: OutlinerNode) {
+        let (orgID, props) = extractProperties(from: &node.text)
+        node.orgID = orgID
+        node.properties = props
+        for child in node.children {
+            extractPropertiesFromNode(child)
+        }
+    }
+    extractPropertiesFromNode(rootNode)
 
     func trimTrailingNewlines(_ node: OutlinerNode) {
         while node.text.hasSuffix("\n") {

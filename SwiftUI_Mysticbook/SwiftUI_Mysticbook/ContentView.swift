@@ -30,64 +30,299 @@ private struct SidebarButtonBar: View {
 
 private struct FlashcardTabView: View {
 	let workspaceDirectoryURL: URL?
+	let document: OutlinerDocument?
+	let saveURL: URL?
 
-	@State private var flashcardCount = 0
+	@State private var deck = FlashcardDeck()
 	@State private var isLoading = true
+	@State private var isStudying = false
 
 	var body: some View {
-		VStack(spacing: 20) {
-			Image(systemName: "rectangle.on.rectangle")
-				.font(.system(size: 48))
-				.foregroundColor(.secondary)
-
+		Group {
 			if isLoading {
 				ProgressView("Scanning for flashcards...")
+					.frame(maxWidth: .infinity, maxHeight: .infinity)
+			} else if isStudying {
+				inlineStudyContent
+			} else if deck.flashcards.isEmpty {
+				emptyState
 			} else {
-				Text("Flashcards")
-					.font(.title2)
-
-				Button("Study Flashcards: \(flashcardCount)") {
-					// Future: open study UI
-				}
-				.buttonStyle(.borderedProminent)
-				.disabled(flashcardCount == 0)
+				landingContent
 			}
 		}
 		.frame(maxWidth: .infinity, maxHeight: .infinity)
 		.task {
-			await scanFlashcards()
+			await loadFlashcards()
 		}
 	}
 
-	private func scanFlashcards() async {
-		guard let directoryURL = workspaceDirectoryURL else {
-			isLoading = false
-			return
+	private var emptyState: some View {
+		VStack(spacing: 12) {
+			Image(systemName: "rectangle.on.rectangle")
+				.font(.system(size: 48))
+				.foregroundColor(.secondary)
+			if deck.totalFlashcardCount == 0 {
+				Text("No flashcards found")
+					.font(.title2)
+				Text("Add `:->` or `:<->` to outliner rows to create flashcards")
+					.foregroundColor(.secondary)
+			} else {
+				Text("No cards due")
+					.font(.title2)
+				Text("\(deck.totalFlashcardCount) cards, all up to date")
+					.foregroundColor(.secondary)
+			}
 		}
+		.frame(maxWidth: .infinity, maxHeight: .infinity)
+	}
 
-		let count = await Task.detached { () -> Int in
+	private var landingContent: some View {
+		VStack(spacing: 20) {
+			if deck.currentFlashcard == nil {
+				VStack(spacing: 12) {
+					Text("All done!")
+						.font(.title2)
+					Button("Study Again") {
+						if let root = deck.rootNode {
+							deck.load(from: root)
+						}
+					}
+					.buttonStyle(.borderedProminent)
+				}
+			} else {
+				Image(systemName: "rectangle.on.rectangle")
+					.font(.system(size: 48))
+					.foregroundColor(.secondary)
+
+				Text("Flashcards")
+					.font(.title2)
+
+				Text("\(deck.flashcards.count) cards due")
+					.foregroundColor(.secondary)
+
+				Button("Study") {
+					isStudying = true
+				}
+				.buttonStyle(.borderedProminent)
+				.padding(.top, 8)
+			}
+		}
+		.padding(40)
+		.frame(maxWidth: .infinity, maxHeight: .infinity)
+	}
+
+	private var inlineStudyContent: some View {
+		VStack(spacing: 0) {
+			if let card = deck.currentFlashcard {
+				HStack {
+					Button("←") {
+						isStudying = false
+					}
+					.buttonStyle(.plain)
+					.foregroundColor(.secondary)
+
+					Text("\(deck.flashcards.count)")
+						.font(.caption)
+						.foregroundColor(.secondary)
+						.padding(.horizontal, 8)
+						.padding(.vertical, 2)
+						.background(Color.secondary.opacity(0.15))
+						.clipShape(Capsule())
+
+					Text("Flashcards")
+						.font(.headline)
+
+					Spacer()
+
+					Button(action: {}) {
+						Image(systemName: "pencil")
+					}
+					.buttonStyle(.plain)
+					.foregroundColor(.secondary)
+				}
+				.padding(.horizontal, 24)
+				.padding(.vertical, 12)
+
+				Divider()
+
+				VStack(spacing: 0) {
+					Group {
+						if !card.ancestorHeadings.isEmpty {
+							Text(card.ancestorHeadings[0])
+								.font(.subheadline)
+								.foregroundColor(.secondary)
+								.padding(.horizontal, 10)
+								.padding(.vertical, 4)
+								.background(Color.secondary.opacity(0.1))
+								.cornerRadius(6)
+
+							ForEach(Array(card.ancestorHeadings.dropFirst().enumerated()), id: \.offset) { i, heading in
+								HStack(spacing: 0) {
+									Text("• \(heading)")
+										.font(.subheadline)
+								}
+								.padding(.leading, CGFloat(i) * 20)
+							}
+
+							HStack(spacing: 0) {
+								Text("• ")
+								Text(card.question)
+								Text(" \(card.delimiter) ")
+								if deck.isAnswerRevealed {
+									Text(card.answer)
+								} else {
+									Text("[ ? ]")
+										.foregroundColor(.secondary)
+								}
+							}
+							.font(.title2)
+							.padding(.leading, CGFloat(max(0, card.ancestorHeadings.count - 1)) * 20)
+						} else {
+							HStack(spacing: 0) {
+								Text("• ")
+								Text(card.question)
+								Text(" \(card.delimiter) ")
+								if deck.isAnswerRevealed {
+									Text(card.answer)
+								} else {
+									Text("[ ? ]")
+										.foregroundColor(.secondary)
+								}
+							}
+							.font(.title2)
+						}
+					}
+					.frame(maxWidth: .infinity, alignment: .leading)
+
+					Spacer()
+				}
+				.frame(maxWidth: .infinity, maxHeight: .infinity)
+				.padding(.horizontal, 24)
+
+				if deck.isAnswerRevealed {
+					VStack(spacing: 8) {
+						HStack(spacing: 20) {
+							VStack(spacing: 4) {
+								Button("Forgot") {
+									deck.rateForgot(card)
+								}
+								.buttonStyle(.borderedProminent)
+								.tint(.red)
+
+								Text(deck.formatInterval(deck.previewIntervalIfForgot(for: card)))
+									.font(.caption)
+									.foregroundColor(.secondary)
+							}
+
+							VStack(spacing: 4) {
+								Button("Easy") {
+									deck.rateEasy(card)
+								}
+								.buttonStyle(.borderedProminent)
+								.tint(.green)
+
+								Text(deck.formatInterval(deck.previewIntervalIfEasy(for: card)))
+									.font(.caption)
+									.foregroundColor(.secondary)
+							}
+						}
+					}
+					.padding(.bottom, 32)
+				} else {
+					Button(action: { deck.showAnswer() }) {
+						HStack(spacing: 6) {
+							Image(systemName: "eye")
+							Text("Show Answer")
+						}
+						.frame(maxWidth: 260)
+						.padding(.vertical, 12)
+						.background(Color.accentColor.opacity(0.1))
+						.cornerRadius(8)
+						.overlay(
+							RoundedRectangle(cornerRadius: 8)
+								.stroke(Color.accentColor.opacity(0.3), lineWidth: 1)
+						)
+					}
+					.buttonStyle(.plain)
+					.padding(.bottom, 32)
+				}
+			} else {
+				VStack(spacing: 12) {
+					HStack {
+						Button("←") {
+							isStudying = false
+						}
+						.buttonStyle(.plain)
+						.foregroundColor(.secondary)
+						Spacer()
+					}
+					.padding(.horizontal, 24)
+					.padding(.vertical, 12)
+
+					Divider()
+
+					Spacer()
+
+					Text("All done!")
+						.font(.title2)
+
+					Button("Study Again") {
+						if let root = deck.rootNode {
+							deck.load(from: root)
+						}
+					}
+					.buttonStyle(.borderedProminent)
+
+					Button("Back") {
+						isStudying = false
+					}
+					.buttonStyle(.plain)
+					.foregroundColor(.secondary)
+					.padding(.top, 4)
+
+					Spacer()
+				}
+			}
+		}
+		.frame(maxWidth: .infinity, maxHeight: .infinity)
+	}
+
+	private func loadFlashcards() async {
+		if let document = document {
+			deck.onSave = { [saveURL] in
+				guard let url = saveURL else { return }
+				autoSave(document: document, to: url)
+			}
+			deck.load(from: document.rootNode)
+			isLoading = false
+		} else {
+			if let dir = workspaceDirectoryURL {
+				_ = await scanAllFiles(for: dir)
+			}
+			isLoading = false
+		}
+	}
+
+	private func scanAllFiles(for directoryURL: URL) async -> Int {
+		await Task.detached { () -> Int in
 			var total = 0
 			guard let enumerator = FileManager.default.enumerator(
 				at: directoryURL,
 				includingPropertiesForKeys: nil,
 				options: [.skipsHiddenFiles]
 			) else { return 0 }
-
 			while let fileURL = enumerator.nextObject() as? URL {
 				guard fileURL.pathExtension == "org" else { continue }
 				guard let content = try? String(contentsOf: fileURL) else { continue }
-				let document = orgDeserialize(content)
-				total += countFlashcards(in: document.rootNode)
+				let doc = orgDeserialize(content)
+				total += countFlashcards(in: doc.rootNode)
 			}
 			return total
 		}.value
-
-		flashcardCount = count
-		isLoading = false
 	}
 
 	private func countFlashcards(in node: OutlinerNode) -> Int {
-		var count = FlashcardDeck.extract(from: node.text) != nil ? 1 : 0
+		var count = FlashcardDeck.extractAll(from: node.text)?.count ?? 0
 		for child in node.children {
 			count += countFlashcards(in: child)
 		}
@@ -118,8 +353,13 @@ struct ContentView: View {
 					activePanelId: panelVM.activePanelId,
 					leafContent: { id, tabItem in
 						if tabItem.isFlashcard || tabItem.title == "Flashcards" {
-							FlashcardTabView(workspaceDirectoryURL: workspace.directoryURL)
-								.id(tabItem.id)
+							let active = activeDocumentAndURL()
+							FlashcardTabView(
+								workspaceDirectoryURL: workspace.directoryURL,
+								document: active?.0,
+								saveURL: active?.1
+							)
+							.id(tabItem.id)
 						} else if let document = tabDocuments[tabItem.id] {
 							Outliner(document: document, saveURL: tabDocumentURLs[tabItem.id])
 								.id(tabItem.id)
@@ -204,6 +444,18 @@ struct ContentView: View {
 				showFlashcardPane = false
 			}
 		}
+	}
+
+	private func activeDocumentAndURL() -> (OutlinerDocument, URL?)? {
+		guard let panelId = panelVM.activePanelId ?? panelVM.rootPanel.firstLeafId(),
+			  let leaf = panelVM.rootPanel.findLeaf(panelId: panelId) else { return nil }
+		for tab in leaf.tabs {
+			guard !tab.isFlashcard else { continue }
+			if let doc = tabDocuments[tab.id] {
+				return (doc, tabDocumentURLs[tab.id])
+			}
+		}
+		return nil
 	}
 
 	private func openFlashcards() {

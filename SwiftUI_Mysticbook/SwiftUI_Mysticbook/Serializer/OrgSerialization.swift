@@ -9,8 +9,25 @@ import Foundation
 
 // MARK: - Serialization
 
+private func cleanupFlashcardProperties(_ node: OutlinerNode) {
+    if node.text.contains(":<->") {
+        // bidirectional: keep both SINGLE_* and SINGLE_REV_*
+    } else if node.text.contains(":->") {
+        // forward only: remove stale SINGLE_REV_* properties
+        node.properties = node.properties.filter { !$0.key.hasPrefix("SINGLE_REV_") }
+    } else {
+        // no flashcard: remove all SRS properties
+        node.properties = node.properties.filter { !$0.key.hasPrefix("SINGLE_") }
+    }
+    for child in node.children {
+        cleanupFlashcardProperties(child)
+    }
+}
+
 func orgSerialize(_ document: OutlinerDocument) -> String {
     var lines: [String] = []
+
+    cleanupFlashcardProperties(document.rootNode)
 
     let rootParts = splitHeadingAndBody(document.rootNode.text)
     if !rootParts.heading.isEmpty {

@@ -3,8 +3,10 @@ import SwiftUI
 struct FlatFile: Identifiable {
 	let url: URL
 	let name: String
+	let rootNodeText: String
 	let parentDir: String?
 	var id: URL { url }
+	var displayTitle: String { rootNodeText.isEmpty ? name : rootNodeText }
 }
 
 private func flattenFileTree(_ items: [FileItem]) -> [FlatFile] {
@@ -15,10 +17,29 @@ private func flattenFileTree(_ items: [FileItem]) -> [FlatFile] {
 		} else if !item.isDirectory {
 			let parent = item.url.deletingLastPathComponent()
 			let parentName = parent.lastPathComponent
-			result.append(FlatFile(url: item.url, name: item.name, parentDir: parentName == "/" ? nil : parentName))
+			let text = readRootNodeText(from: item.url)
+			result.append(FlatFile(url: item.url, name: item.name, rootNodeText: text, parentDir: parentName == "/" ? nil : parentName))
 		}
 	}
 	return result
+}
+
+private func readRootNodeText(from url: URL) -> String {
+	guard let content = try? String(contentsOf: url, encoding: .utf8) else { return "" }
+	var firstMeaningful: String?
+	for line in content.split(separator: "\n") {
+		let trimmed = line.trimmingCharacters(in: .whitespaces)
+		if trimmed.hasPrefix("#+TITLE: ") {
+			return String(trimmed.dropFirst(9))
+		}
+		if firstMeaningful == nil, !trimmed.hasPrefix("#+"), !trimmed.hasPrefix(":") {
+			firstMeaningful = trimmed
+		}
+	}
+	if let text = firstMeaningful {
+		return text.hasPrefix("* ") ? String(text.dropFirst(2)) : text
+	}
+	return ""
 }
 
 struct CommandPaletteView: View {
@@ -75,7 +96,9 @@ struct CommandPaletteView: View {
 		if searchText.isEmpty {
 			return result
 		}
-		return result.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+		return result.filter {
+			$0.displayTitle.localizedCaseInsensitiveContains(searchText) || $0.name.localizedCaseInsensitiveContains(searchText)
+		}
 	}
 
 	var body: some View {
@@ -137,8 +160,12 @@ struct CommandPaletteView: View {
 						Image(systemName: "doc.text")
 							.font(.caption)
 							.foregroundStyle(.tertiary)
-						Text(file.name)
+						Text(file.displayTitle)
 							.fontWeight(.medium)
+							.lineLimit(1)
+						Text(file.name)
+							.font(.caption)
+							.foregroundStyle(.tertiary)
 						if let dir = file.parentDir {
 							Text(dir)
 								.font(.caption)

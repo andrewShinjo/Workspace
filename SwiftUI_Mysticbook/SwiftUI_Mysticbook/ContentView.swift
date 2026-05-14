@@ -485,20 +485,26 @@ struct ContentView: View {
 	private func createNewUntitledTab() {
 		guard let panelId = panelVM.activePanelId ?? panelVM.rootPanel.firstLeafId() else { return }
 
-		let existingTitles = panelVM.rootPanel.allTabTitles()
-
+		let timestamp = Int(Date().timeIntervalSince1970)
 		var index = 0
-		let baseName = "Untitled"
 		var candidate: String
 		repeat {
-			let suffix = index == 0 ? "" : " \(index)"
-			candidate = "\(baseName)\(suffix).org"
+			let suffix = index == 0 ? "" : "_\(index)"
+			candidate = "\(timestamp)\(suffix).org"
 			index += 1
-		} while existingTitles.contains(candidate) || fileExistsOnDisk(candidate)
+		} while fileExistsOnDisk(candidate)
 
 		let document = OutlinerDocument(rootNode: OutlinerNode(text: ""))
 		let tabId = panelVM.addTab(to: panelId, title: candidate)
 		tabDocuments[tabId] = document
+
+		if let dir = workspace.directoryURL {
+			let url = dir.appendingPathComponent(candidate)
+			let content = orgSerialize(document)
+			try? content.write(to: url, atomically: true, encoding: .utf8)
+			tabDocumentURLs[tabId] = url
+			documentRegistry[url] = document
+		}
 	}
 
 	private func fileExistsOnDisk(_ filename: String) -> Bool {
